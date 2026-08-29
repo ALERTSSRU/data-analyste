@@ -1,10 +1,47 @@
 @import "tailwindcss";
 
+/* ─── DESIGN TOKENS (dark mode default) ─── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #050816;
+  --foreground: #e2e8f0;
+  --foreground-muted: #94a3b8;
+  --foreground-faint: #475569;
+  --panel: rgba(15, 23, 42, 0.58);
+  --panel-border: rgba(148, 163, 184, 0.18);
+  --glow-from: rgba(14, 165, 233, 0.22);
+  --glow-to: rgba(15, 23, 42, 0.08);
+  --nav-bg: rgba(5, 8, 22, 0.55);
+  --nav-border: rgba(255,255,255,0.10);
+  --card-bg: rgba(15, 23, 42, 0.70);
+  --accent: #22d3ee;
+  --overlay-gradient-start: rgba(5, 8, 22, 0.15);
+  --overlay-gradient-middle: rgba(5, 8, 22, 0.40);
+  --overlay-gradient-end: rgba(5, 8, 22, 0.80);
 }
 
+/* ─── LIGHT THEME: Premium navy-on-white palette ───
+   Inspired by Linear, Vercel, Notion.
+   Deep navies for text, vivid sky-blue for accent, soft white cards.
+*/
+html.light {
+  --background: #f6f7fb;
+  --panel: rgba(255,255,255,0.92);
+  --card-bg: rgba(255,255,255,0.97);
+  --foreground: #111827;
+  --foreground-muted: #374151;
+  --foreground-faint: #6b7280;
+  --panel-border: rgba(17,24,39,0.12);
+  --nav-border: rgba(17,24,39,0.10);
+  --nav-bg: rgba(255,255,255,0.84);
+  --accent: #0ea5e9;
+  --glow-from: rgba(14,165,233,0.10);
+  --glow-to: rgba(186,230,253,0.10);
+  --overlay-gradient-start: rgba(246,247,251,0.05);
+  --overlay-gradient-middle: rgba(246,247,251,0.35);
+  --overlay-gradient-end: rgba(246,247,251,0.80);
+}
+
+/* ─── TAILWIND TOKENS ─── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -12,15 +49,121 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+html { scroll-behavior: auto; }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  transition: background 300ms ease, color 300ms ease;
 }
+
+* { box-sizing: border-box; }
+
+::selection {
+  background: rgba(14, 165, 233, 0.28);
+  color: #0f172a;
+}
+
+/* ─── GLASS PANEL ─── */
+.glass-panel {
+  background: var(--card-bg);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+/* ─── SCENE WASH ─── */
+.scene-wash {
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 18%, var(--glow-from), transparent 62%),
+    radial-gradient(ellipse 50% 40% at 80% 70%, var(--glow-to), transparent 70%);
+  transition: background 400ms ease;
+}
+html.light .scene-wash { opacity: 0.5; }
+
+/* ─── LIGHT THEME: Comprehensive Tailwind overrides ───
+   These ensure ALL slate-* utilities pick up the correct light colours
+   without having to change every component individually.
+*/
+
+/* ── Text ── */
+html.light .text-white,
+html.light .text-slate-50,
+html.light .text-slate-100,
+html.light .text-slate-200 { color: #111827 !important; }
+html.light .text-slate-300 { color: #1f2937 !important; }
+html.light .text-slate-400 { color: #374151 !important; }
+html.light .text-slate-500 { color: #6b7280 !important; }
+html.light .text-slate-600 { color: #9ca3af !important; }
+
+/* Accent colours – keep vibrant but readable on white */
+html.light .text-cyan-200,
+html.light .text-cyan-300  { color: #0ea5e9 !important; }
+html.light .text-cyan-400  { color: #0284c7 !important; }
+html.light .text-emerald-200,
+html.light .text-emerald-300 { color: #059669 !important; }
+html.light .text-violet-200,
+html.light .text-violet-300  { color: #7c3aed !important; }
+
+/* ── Backgrounds ── */
+html.light .bg-\[\#050816\] { background: var(--background) !important; }
+
+html.light .bg-slate-950,
+html.light .bg-slate-900 { background-color: #f6f7fb !important; }
+
+html.light .bg-slate-950\/35,
+html.light .bg-slate-950\/40,
+html.light .bg-slate-950\/45,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-900\/60 { background-color: rgba(255,255,255,0.90) !important; }
+
+html.light .bg-slate-800 { background-color: rgba(241,242,246,0.95) !important; }
+
+/* ── Borders ── */
+html.light .border-white\/10 { border-color: rgba(17,24,39,0.10) !important; }
+html.light .border-white\/20 { border-color: rgba(17,24,39,0.16) !important; }
+html.light .border-slate-700,
+html.light .border-slate-800 { border-color: rgba(17,24,39,0.14) !important; }
+
+/* ── Glass panels & cards ── */
+html.light .glass-panel { background: rgba(255,255,255,0.95) !important; }
+
+/* ── Forms (admin + contact) ── */
+html.light input,
+html.light textarea,
+html.light select {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border-color: rgba(17,24,39,0.18) !important;
+}
+html.light input::placeholder,
+html.light textarea::placeholder { color: #9ca3af !important; }
+
+/* ── Floating contact bubbles in light mode ── */
+html.light .bubble-float-1,
+html.light .bubble-float-2,
+html.light .bubble-float-3,
+html.light .bubble-float-4 {
+  background-color: rgba(255,255,255,0.95) !important;
+  border-color: rgba(17,24,39,0.16) !important;
+  color: #111827 !important;
+}
+
+.network-surface { box-shadow: inset 0 0 25px rgba(34,211,238,0.08); }
+
+/* ─── SMOOTH PAGE TRANSITIONS ─── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: fadeInUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ─── BOUNCING BUBBLE CONTACT ANIMATIONS ─── */
+@keyframes bubbleBounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-7px); }
+}
+.bubble-float-1 { animation: bubbleBounce 2.5s ease-in-out infinite; }
+.bubble-float-2 { animation: bubbleBounce 2.8s ease-in-out infinite 0.3s; }
+.bubble-float-3 { animation: bubbleBounce 2.6s ease-in-out infinite 0.6s; }
+.bubble-float-4 { animation: bubbleBounce 3.0s ease-in-out infinite 0.9s; }
