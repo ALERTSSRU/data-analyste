@@ -49,13 +49,18 @@ html.light {
   --font-mono: var(--font-geist-mono);
 }
 
-html { scroll-behavior: auto; }
+html { 
+  scroll-behavior: auto;
+  overflow-x: hidden; /* prevent horizontal scrollbar that can break Lenis */
+}
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   transition: background 300ms ease, color 300ms ease;
+  overflow-x: hidden;
+  /* NEVER set overflow-y here – Lenis needs native scroll on the body */
 }
 
 * { box-sizing: border-box; }

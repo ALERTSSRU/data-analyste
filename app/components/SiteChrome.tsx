@@ -47,6 +47,10 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
     setTheme(next);
     document.documentElement.classList.toggle('light', next === 'light');
     try { localStorage.setItem('theme', next); } catch {}
+    // Force Lenis / ScrollTrigger to recalculate scroll dimensions after theme CSS changes
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
   };
 
   // Glow / phase sync
@@ -77,7 +81,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
 
   return (
     <LenisScroll>
-      <div className="relative min-h-screen text-slate-100 transition-colors duration-300">
+      <div className="relative min-h-screen transition-colors duration-300" style={{ color: 'var(--foreground)' }}>
         {/* 3D background */}
         <div className="pointer-events-none fixed inset-0 z-0">
           <DataField />

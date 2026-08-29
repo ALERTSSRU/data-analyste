@@ -2,143 +2,175 @@
 
 import type { PortfolioProject } from '@/lib/portfolio';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface ProjectCarousel3DProps {
   projects: PortfolioProject[];
 }
 
 export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
-  const count = projects.length;
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [angle, setAngle] = useState(0);
+  const count        = projects.length;
+  const [angle, setAngle]           = useState(0);
   const [targetAngle, setTargetAngle] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  // Track if pointer moved enough to be a drag (not a click)
-  const didDragRef     = useRef(false);
-  const dragStartX     = useRef(0);
-  const dragStartY     = useRef(0);
-  const dragBaseAngle  = useRef(0);
-  const rafRef         = useRef<number>(0);
-  const autoRef        = useRef<ReturnType<typeof setInterval> | null>(null);
-  const resumeTimeout  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused]       = useState(false);
+
+  // Internal refs — never cause re-renders
+  const rafRef          = useRef<number>(0);
+  const autoTimerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resumeRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stageRef        = useRef<HTMLDivElement>(null);
+
+  const dragActiveRef   = useRef(false); // true ONLY when confirmed horizontal drag
+  const startXRef       = useRef(0);
+  const startYRef       = useRef(0);
+  const baseAngleRef    = useRef(0);
+  const movedRef        = useRef(false); // whether pointer moved enough to block click
 
   const anglePerCard = count > 0 ? 360 / count : 0;
   const radius       = Math.max(280, count * 72);
 
-  // ── Smooth angle damping ──
+  // ── Smooth damping ──
   useEffect(() => {
-    const animate = () => {
+    const loop = () => {
       setAngle((prev) => {
-        const diff = targetAngle - prev;
-        if (Math.abs(diff) < 0.04) return targetAngle;
-        return prev + diff * 0.09;
+        const d = targetAngle - prev;
+        return Math.abs(d) < 0.04 ? targetAngle : prev + d * 0.09;
       });
-      rafRef.current = requestAnimationFrame(animate);
+      rafRef.current = requestAnimationFrame(loop);
     };
-    rafRef.current = requestAnimationFrame(animate);
+    rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
   }, [targetAngle]);
 
-  // ── Auto-rotation (pauses on hover / drag) ──
-  const startAuto = useCallback(() => {
-    if (autoRef.current) clearInterval(autoRef.current);
-    autoRef.current = setInterval(() => {
-      setTargetAngle((prev) => prev - 0.30);
-    }, 30);
-  }, []);
-
-  const stopAuto = useCallback(() => {
-    if (autoRef.current) { clearInterval(autoRef.current); autoRef.current = null; }
-  }, []);
-
+  // ── Active index ──
   useEffect(() => {
-    if (!isPaused && !isDragging) { startAuto(); } else { stopAuto(); }
-    return stopAuto;
-  }, [isPaused, isDragging, startAuto, stopAuto]);
-
-  // Compute active index from angle
-  useEffect(() => {
-    const normalized = ((-angle % 360) + 360) % 360;
-    const idx = Math.round(normalized / anglePerCard) % count;
-    setActiveIndex(idx < 0 ? idx + count : idx);
+    const n = ((-angle % 360) + 360) % 360;
+    const i = Math.round(n / anglePerCard) % count;
+    setActiveIndex(i < 0 ? i + count : i);
   }, [angle, anglePerCard, count]);
 
-  // ── DRAG: Only activate if user pulls HORIZONTALLY ≥ 10px ──
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    // Only left button (button 0)
-    if (e.button !== 0) return;
-    dragStartX.current   = e.clientX;
-    dragStartY.current   = e.clientY;
-    dragBaseAngle.current = targetAngle;
-    didDragRef.current   = false;
+  // ── Auto-rotation helpers ──
+  const startAuto = () => {
+    stopAuto();
+    autoTimerRef.current = setInterval(() => {
+      setTargetAngle((p) => p - 0.28);
+    }, 30);
+  };
+  const stopAuto = () => {
+    if (autoTimerRef.current) { clearInterval(autoTimerRef.current); autoTimerRef.current = null; }
+  };
+  const scheduleResume = (ms = 2400) => {
+    if (resumeRef.current) clearTimeout(resumeRef.current);
+    resumeRef.current = setTimeout(() => setIsPaused(false), ms);
+  };
+
+  useEffect(() => {
+    if (!isPaused) startAuto(); else stopAuto();
+    return stopAuto;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaused]);
+
+  // ── Native-friendly pointer handlers ──
+  // Strategy: attach raw listeners to the stage element so we can call
+  // preventDefault ONLY after confirming a horizontal drag — browsers
+  // require this to happen in a non-passive listener attached via addEventListener.
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+
+    const onDown = (e: PointerEvent) => {
+      if (e.button !== 0) return; // left button only
+      startXRef.current    = e.clientX;
+      startYRef.current    = e.clientY;
+      baseAngleRef.current = targetAngle; // captured via closure — see note*
+      dragActiveRef.current = false;
+      movedRef.current      = false;
+    };
+
+    const onMove = (e: PointerEvent) => {
+      if (e.buttons !== 1) return; // only while left button held
+      const dx = e.clientX - startXRef.current;
+      const dy = e.clientY - startYRef.current;
+
+      if (!dragActiveRef.current) {
+        const dist = Math.hypot(dx, dy);
+        if (dist < 8) return;
+        // Vertical dominant → let page scroll, don't drag carousel
+        if (Math.abs(dy) > Math.abs(dx)) return;
+        // Confirmed horizontal drag
+        dragActiveRef.current = true;
+        movedRef.current      = true;
+        stopAuto();
+        if (resumeRef.current) clearTimeout(resumeRef.current);
+      }
+
+      if (dragActiveRef.current) {
+        // Only prevent scroll after confirmed horizontal drag
+        e.preventDefault();
+        setTargetAngle(baseAngleRef.current + dx * 0.20);
+      }
+    };
+
+    const onUp = () => {
+      if (dragActiveRef.current) {
+        // Snap to nearest slot
+        setTargetAngle((prev) => Math.round(prev / anglePerCard) * anglePerCard);
+        scheduleResume();
+      }
+      dragActiveRef.current = false;
+      // movedRef stays true briefly so click handlers can check it
+      setTimeout(() => { movedRef.current = false; }, 50);
+    };
+
+    // { passive: false } is required so we can call e.preventDefault() on horizontal drag
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointermove', onMove, { passive: false });
+    el.addEventListener('pointerup',   onUp);
+    el.addEventListener('pointerleave', onUp);
+
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup',   onUp);
+      el.removeEventListener('pointerleave', onUp);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anglePerCard]); // *targetAngle is read via a separate ref below
+
+  // Keep baseAngleRef in sync with targetAngle so the closure always has latest value
+  const targetAngleRef = useRef(targetAngle);
+  useEffect(() => {
+    targetAngleRef.current = targetAngle;
+    // Also patch baseAngle when NOT dragging so next drag starts fresh
+    if (!dragActiveRef.current) baseAngleRef.current = targetAngle;
   }, [targetAngle]);
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    const dx = e.clientX - dragStartX.current;
-    const dy = e.clientY - dragStartY.current;
-
-    // Only capture once intent is confirmed as horizontal drag
-    if (!didDragRef.current) {
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 10) return;                         // too small – ignore
-      if (Math.abs(dy) > Math.abs(dx)) return;       // more vertical than horizontal – let page scroll
-      // Confirmed horizontal drag
-      didDragRef.current = true;
-      setIsDragging(true);
-      stopAuto();
-      if (resumeTimeout.current) clearTimeout(resumeTimeout.current);
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    }
-
-    if (didDragRef.current) {
-      // Prevent page scroll only during confirmed horizontal drag
-      e.stopPropagation();
-      setTargetAngle(dragBaseAngle.current + dx * 0.20);
-    }
-  }, [stopAuto]);
-
-  const onPointerUp = useCallback((e: React.PointerEvent) => {
-    if (!didDragRef.current) {
-      // Was a tap/click, not drag – nothing to snap
-      setIsDragging(false);
-      return;
-    }
-    // Snap to nearest card
-    const snapped = Math.round(targetAngle / anglePerCard) * anglePerCard;
-    setTargetAngle(snapped);
-    setIsDragging(false);
-    didDragRef.current = false;
-    // Resume auto-rotation after a comfortable delay
-    if (resumeTimeout.current) clearTimeout(resumeTimeout.current);
-    resumeTimeout.current = setTimeout(() => setIsPaused(false), 2400);
-  }, [targetAngle, anglePerCard]);
 
   const goTo = (idx: number) => {
     stopAuto();
     setTargetAngle(-idx * anglePerCard);
-    if (resumeTimeout.current) clearTimeout(resumeTimeout.current);
-    resumeTimeout.current = setTimeout(() => setIsPaused(false), 2600);
+    scheduleResume(2600);
   };
 
   if (count === 0) return null;
 
   return (
     <div className="relative w-full select-none">
-      {/* 3D stage – only captures pointer events for horizontal drag */}
+      {/* 
+        touch-action: pan-y — tells browser:
+          "Handle vertical scroll natively; let JS handle horizontal gestures."
+        This is the KEY fix that allows page scroll to always work.
+      */}
       <div
+        ref={stageRef}
         className="relative mx-auto overflow-visible"
         style={{
           height: 390,
           perspective: '1200px',
           perspectiveOrigin: '50% 45%',
-          cursor: isDragging ? 'grabbing' : 'grab',
+          touchAction: 'pan-y',
+          cursor: 'grab',
         }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerLeave={onPointerUp}
       >
         {/* Rotating cylinder */}
         <div
@@ -149,10 +181,10 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
           }}
         >
           {projects.map((project, i) => {
-            const cardAngle  = i * anglePerCard;
-            const isActive   = i === activeIndex;
+            const cardAngle = i * anglePerCard;
+            const isActive  = i === activeIndex;
             const scale      = isActive ? 1.0 : 0.84;
-            const brightness = isActive ? 1 : 0.52;
+            const brightness = isActive ? 1   : 0.52;
 
             return (
               <div
@@ -163,29 +195,26 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
                   left: '50%',
                   top: '50%',
                   marginLeft: -135,
-                  marginTop: -165,
+                  marginTop:  -165,
                   transformStyle: 'preserve-3d',
                   transform: `rotateY(${cardAngle}deg) translateZ(${radius}px)`,
                 }}
                 onMouseEnter={() => setIsPaused(true)}
-                onMouseLeave={() => {
-                  setIsPaused(false);
-                  if (resumeTimeout.current) clearTimeout(resumeTimeout.current);
-                }}
+                onMouseLeave={() => { setIsPaused(false); if (resumeRef.current) clearTimeout(resumeRef.current); }}
               >
                 <Link
                   href={`/projects/${project.slug}`}
                   draggable={false}
                   onClick={(e) => {
-                    // Prevent navigation if the user was dragging
-                    if (didDragRef.current) { e.preventDefault(); }
+                    // Block navigation if the user was actually dragging
+                    if (movedRef.current) e.preventDefault();
                   }}
                   style={{
                     display: 'block',
                     transform: `scale(${scale})`,
                     filter: `brightness(${brightness})`,
                     transition: 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1), filter 0.3s ease',
-                    pointerEvents: isDragging ? 'none' : 'auto',
+                    pointerEvents: dragActiveRef.current ? 'none' : 'auto',
                   }}
                 >
                   <div
@@ -240,7 +269,7 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
                     </div>
 
                     {/* Content */}
-                    <div className="p-4" style={{ background: 'rgba(0,0,0,0.06)' }}>
+                    <div className="p-4" style={{ background: 'rgba(0,0,0,0.05)' }}>
                       <h3
                         className="text-base font-bold leading-tight line-clamp-1"
                         style={{ color: 'var(--foreground)' }}
@@ -291,7 +320,7 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
           <button
             key={i}
             onClick={() => goTo(i)}
-            className="rounded-full transition-all duration-300"
+            className="rounded-full transition-all duration-300 cursor-pointer"
             style={{
               width:  i === activeIndex ? 20 : 6,
               height: 6,
@@ -301,7 +330,10 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
         ))}
       </div>
 
-      <p className="mt-2.5 text-center text-[9px] uppercase tracking-[0.22em]" style={{ color: 'var(--foreground-faint)' }}>
+      <p
+        className="mt-2.5 text-center text-[9px] uppercase tracking-[0.22em]"
+        style={{ color: 'var(--foreground-faint)' }}
+      >
         ← glissez pour explorer →
       </p>
     </div>
