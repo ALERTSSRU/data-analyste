@@ -7,7 +7,7 @@ import { translateFrToEn } from '@/lib/translate';
 type LanguageContextValue = {
   lang: Lang;
   setLang: (l: Lang) => void;
-  t: typeof translations.fr;
+  t: typeof translations.fr | typeof translations.en;
 };
 
 const LanguageContext = createContext<LanguageContextValue>({
@@ -33,8 +33,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem('lang', l); } catch {}
   };
 
+  const t = translations[lang as keyof typeof translations];
   return (
-    <LanguageContext.Provider value={{ lang, setLang, t: translations[lang] }}>
+    <LanguageContext.Provider value={{ lang, setLang, t }}>
       {children}
     </LanguageContext.Provider>
   );

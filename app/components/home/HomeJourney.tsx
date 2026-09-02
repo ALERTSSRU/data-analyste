@@ -2,17 +2,17 @@
 
 import { ProjectCarousel3D } from '@/app/components/ProjectCarousel3D';
 import { ScrollReveal } from '@/app/components/ScrollReveal';
+import { Trans, useLanguage } from '@/lib/LanguageContext';
 import {
-  isBankExperience,
-  type PortfolioCertification,
-  type PortfolioEducation,
-  type PortfolioExperience,
-  type PortfolioProfile,
-  type PortfolioProject,
-  type PortfolioSkill,
+    isBankExperience,
+    type PortfolioCertification,
+    type PortfolioEducation,
+    type PortfolioExperience,
+    type PortfolioProfile,
+    type PortfolioProject,
+    type PortfolioSkill,
 } from '@/lib/portfolio';
 import { sceneState } from '@/lib/scene-state';
-import { useLanguage, Trans } from '@/lib/LanguageContext';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Link from 'next/link';
@@ -245,7 +245,7 @@ export function HomeJourney({
 
       <section data-scene="finale" className="relative mx-auto max-w-6xl px-6 py-32">
         <ScrollReveal>
-          <div className="glass-panel rounded-[32px] border border-violet-400/20 p-10 text-center md:p-16">
+          <div className="glass-panel rounded-4xl border border-violet-400/20 p-10 text-center md:p-16">
             <p className="text-xs uppercase tracking-[0.28em] text-violet-300">{t.sections.finale_label}</p>
             <h2 className="mt-4 text-4xl font-black tracking-tighter text-white md:text-5xl">
               {t.sections.finale_heading}

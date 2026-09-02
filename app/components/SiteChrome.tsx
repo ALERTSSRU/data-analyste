@@ -3,8 +3,8 @@
 import { DataField } from '@/app/components/canvas/DataField';
 import { LenisScroll } from '@/app/components/LenisScroll';
 import { LanguageProvider, useLanguage } from '@/lib/LanguageContext';
-import { phaseFromProgress, sceneState, tintFromProgress } from '@/lib/scene-state';
 import { getProfile } from '@/lib/portfolio';
+import { phaseFromProgress, sceneState, tintFromProgress } from '@/lib/scene-state';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Link from 'next/link';
@@ -12,6 +12,63 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 gsap.registerPlugin(ScrollTrigger);
+
+function ContactGlyph({ children, className = 'h-4 w-4' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      {children}
+    </svg>
+  );
+}
+
+function EmailIcon() {
+  return (
+    <ContactGlyph>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="M3.5 7.5L12 13l8.5-5.5" />
+    </ContactGlyph>
+  );
+}
+
+function LinkedInIcon() {
+  return (
+    <ContactGlyph>
+      <path d="M7.5 9.5v7" />
+      <path d="M7.5 6.5h.01" />
+      <path d="M11.5 16.5v-4.2c0-1.5 1.2-2.8 2.8-2.8s2.7 1.3 2.7 2.8v4.2" />
+      <path d="M11.5 9.5v7" />
+    </ContactGlyph>
+  );
+}
+
+function GitHubIcon() {
+  return (
+    <ContactGlyph>
+      <path d="M9 18.5c-3.7 1.2-3.7-1.8-5-2.1" />
+      <path d="M15 20.5v-2.7a3.3 3.3 0 0 0-.9-2.5c3-.3 6.1-1.5 6.1-6.8a5.2 5.2 0 0 0-1.4-3.6 4.7 4.7 0 0 0-.1-3.4s-1.1-.4-3.7 1.4a12.9 12.9 0 0 0-6.7 0C6.5 2.8 5.4 3.2 5.4 3.2a4.7 4.7 0 0 0-.1 3.4A5.2 5.2 0 0 0 3.9 10.2c0 5.3 3.1 6.5 6.1 6.8a3.3 3.3 0 0 0-.9 2.5v2.7" />
+    </ContactGlyph>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <ContactGlyph>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17" />
+      <path d="M12 3.5c2.5 2.4 3.8 5.2 3.8 8.5S14.5 18.1 12 20.5c-2.5-2.4-3.8-5.2-3.8-8.5S9.5 5.9 12 3.5Z" />
+    </ContactGlyph>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <ContactGlyph className="h-5 w-5">
+      <path d="M7 17.5 4 19.5v-12a2.5 2.5 0 0 1 2.5-2.5h11A2.5 2.5 0 0 1 20 7.5v8A2.5 2.5 0 0 1 17.5 18H7Z" />
+      <path d="M8 10h8" />
+      <path d="M8 13h5" />
+    </ContactGlyph>
+  );
+}
 
 // ── Inner chrome (has access to language context) ──
 function ChromeInner({ children }: { children: React.ReactNode }) {
@@ -21,6 +78,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [profile, setProfile] = useState<any>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const isHome = pathname === '/';
 
   // Only show Home link in the header nav per user request
@@ -30,27 +88,36 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
 
   // Fetch profile for floating contact bubbles
   useEffect(() => {
-    getProfile().then(setProfile);
+    if (typeof window !== 'undefined') {
+      getProfile().then(setProfile);
+    }
+  }, []);
+
+  // Mark as hydrated to prevent mismatches
+  useEffect(() => {
+    setIsHydrated(true);
   }, []);
 
   // Apply theme class to <html>
   useEffect(() => {
+    if (!isHydrated) return;
     const saved = localStorage.getItem('theme') as 'dark' | 'light' | null;
-    if (saved) { 
-      setTheme(saved); 
-      document.documentElement.classList.toggle('light', saved === 'light'); 
+    if (saved && saved !== theme) {
+      setTheme(saved);
     }
-  }, []);
+    document.documentElement.classList.toggle('light', saved === 'light' || (saved === null && theme === 'light'));
+  }, [isHydrated, theme]);
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
-    document.documentElement.classList.toggle('light', next === 'light');
     try { localStorage.setItem('theme', next); } catch {}
     // Force Lenis / ScrollTrigger to recalculate scroll dimensions after theme CSS changes
-    requestAnimationFrame(() => {
-      window.dispatchEvent(new Event('resize'));
-    });
+    if (typeof window !== 'undefined') {
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
+    }
   };
 
   // Glow / phase sync
@@ -58,8 +125,10 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
     let frame = 0;
     const tick = () => {
       const tint = tintFromProgress(sceneState.progress);
-      document.documentElement.style.setProperty('--glow-from', tint.from);
-      document.documentElement.style.setProperty('--glow-to', tint.to);
+      if (typeof document !== 'undefined') {
+        document.documentElement.style.setProperty('--glow-from', tint.from);
+        document.documentElement.style.setProperty('--glow-to', tint.to);
+      }
       const next = phaseFromProgress(sceneState.progress);
       setPhase((current) => (current === next ? current : next));
       frame = requestAnimationFrame(tick);
@@ -69,7 +138,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!isHome) {
+    if (typeof window !== 'undefined' && !isHome) {
       sceneState.target = pathname.includes('experiences') ? 0.6 : pathname.includes('project') ? 0.82 : 0.12;
     }
   }, [isHome, pathname]);
@@ -86,7 +155,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
         <div className="pointer-events-none fixed inset-0 z-0">
           <DataField />
           {/* Overlay gradients reactive to dark/light CSS variables */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--overlay-gradient-start)] via-[var(--overlay-gradient-middle)] to-[var(--overlay-gradient-end)] transition-all duration-300" />
+          <div className="absolute inset-0 bg-linear-to-b from-(--overlay-gradient-start) via-(--overlay-gradient-middle) to-(--overlay-gradient-end) transition-all duration-300" />
           <div className="scene-wash absolute inset-0" />
         </div>
 
@@ -121,9 +190,11 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
             {/* Right controls */}
             <div className="flex items-center gap-2">
               {/* Phase label */}
-              <span className="hidden text-[10px] uppercase tracking-[0.22em] text-slate-400 sm:block">
-                {phaseLabel}
-              </span>
+              {isHydrated && (
+                <span className="hidden text-[10px] uppercase tracking-[0.22em] text-slate-400 sm:block">
+                  {phaseLabel}
+                </span>
+              )}
 
               {/* FR / EN toggle */}
               <button
@@ -141,25 +212,27 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
               </button>
 
               {/* Dark / Light toggle */}
-              <button
-                onClick={toggleTheme}
-                title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
-                className="flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-300 hover:border-cyan-500/40 hover:text-cyan-400/70 cursor-pointer"
-                style={{ borderColor: 'var(--panel-border)', color: 'var(--foreground-muted)' }}
-              >
-                {theme === 'dark' ? (
-                  <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                    <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                  </svg>
-                )}
-              </button>
+              {isHydrated && (
+                <button
+                  onClick={toggleTheme}
+                  title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-300 hover:border-cyan-500/40 hover:text-cyan-400/70 cursor-pointer"
+                  style={{ borderColor: 'var(--panel-border)', color: 'var(--foreground-muted)' }}
+                >
+                  {theme === 'dark' ? (
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                      <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                      <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                    </svg>
+                  )}
+                </button>
+              )}
 
               {/* Admin gear */}
-              {pathname !== '/admin' && (
+              {isHydrated && pathname !== '/admin' && (
                 <Link
                   href="/admin"
                   title="Tableau de bord administrateur"
@@ -178,17 +251,17 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
         <div className="relative z-10 page-enter">{children}</div>
 
         {/* Floating Bouncing Contact Bubbles */}
-        {profile && (
-          <div 
+        {isHydrated && profile && (
+          <div
             className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 font-sans group"
             onMouseEnter={() => setIsMenuOpen(true)}
             onMouseLeave={() => setIsMenuOpen(false)}
           >
             {/* Expanded bouncing bubbles */}
-            <div 
+            <div
               className={`flex flex-col gap-2.5 items-center transition-all duration-300 origin-bottom mb-1 ${
-                isMenuOpen 
-                  ? 'scale-100 opacity-100 pointer-events-auto' 
+                isMenuOpen
+                  ? 'scale-100 opacity-100 pointer-events-auto'
                   : 'scale-75 opacity-0 pointer-events-none'
               }`}
             >
@@ -200,7 +273,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
                   className="flex h-11 w-11 items-center justify-center rounded-full border bg-slate-950/80 shadow-lg text-white hover:border-cyan-400 hover:text-cyan-300 transition-all duration-300 bubble-float-1"
                   style={{ borderColor: 'var(--panel-border)' }}
                 >
-                  📧
+                  <EmailIcon />
                 </a>
               )}
               {/* LinkedIn */}
@@ -213,7 +286,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
                   className="flex h-11 w-11 items-center justify-center rounded-full border bg-slate-950/80 shadow-lg text-white hover:border-cyan-400 hover:text-cyan-300 transition-all duration-300 bubble-float-2"
                   style={{ borderColor: 'var(--panel-border)' }}
                 >
-                  💼
+                  <LinkedInIcon />
                 </a>
               )}
               {/* GitHub */}
@@ -226,7 +299,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
                   className="flex h-11 w-11 items-center justify-center rounded-full border bg-slate-950/80 shadow-lg text-white hover:border-cyan-400 hover:text-cyan-300 transition-all duration-300 bubble-float-3"
                   style={{ borderColor: 'var(--panel-border)' }}
                 >
-                  💻
+                  <GitHubIcon />
                 </a>
               )}
               {/* Website contact */}
@@ -239,17 +312,17 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
                   className="flex h-11 w-11 items-center justify-center rounded-full border bg-slate-950/80 shadow-lg text-white hover:border-cyan-400 hover:text-cyan-300 transition-all duration-300 bubble-float-4"
                   style={{ borderColor: 'var(--panel-border)' }}
                 >
-                  🌐
+                  <GlobeIcon />
                 </a>
               )}
             </div>
 
             {/* Main bouncing trigger bubble */}
             <button
-              className="flex h-13 w-13 items-center justify-center rounded-full border bg-gradient-to-r from-cyan-400 to-sky-500 text-slate-950 shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 relative cursor-pointer"
+              className="flex h-13 w-13 items-center justify-center rounded-full border bg-linear-to-r from-cyan-400 to-sky-500 text-slate-950 shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 relative cursor-pointer"
               style={{ borderColor: 'rgba(34,211,238,0.3)' }}
             >
-              <span className="text-xl">💬</span>
+              <ChatIcon />
               {/* Pulsing notification dot */}
               <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>

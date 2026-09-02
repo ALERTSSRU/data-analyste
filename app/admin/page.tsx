@@ -1,8 +1,8 @@
 'use client';
 
 import { supabase } from '@/lib/portfolio';
-import { useEffect, useState } from 'react';
 import { translateFrToEn } from '@/lib/translate';
+import { useEffect, useState } from 'react';
 
 type UserSession = {
   id: string;
@@ -61,7 +61,7 @@ export default function AdminPage() {
       btn.disabled = true;
       try {
         const trans = await translateFrToEn(input.value);
-        
+
         // programmatically update React controlled inputs
         const valueSetter = Object.getOwnPropertyDescriptor(input, 'value')?.set;
         const prototype = Object.getPrototypeOf(input);
@@ -91,7 +91,7 @@ export default function AdminPage() {
     }
 
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase!.auth.getSession();
       if (session?.user) {
         setUser({ id: session.user.id, email: session.user.email });
       }
@@ -100,7 +100,7 @@ export default function AdminPage() {
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase!.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser({ id: session.user.id, email: session.user.email });
       } else {
@@ -276,13 +276,13 @@ export default function AdminPage() {
   };
 
   // Submit handler for forms
-  const handleFormSubmit = async (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!supabase) return;
     setFormLoading(true);
     setFormError('');
 
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
     const data: Record<string, any> = {};
     formData.forEach((value, key) => {
       // Handle boolean checkboxes
@@ -876,7 +876,7 @@ export default function AdminPage() {
       {/* CRUD Overlay Form Modal */}
       {isFormOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 backdrop-blur-xs">
-          <div className="glass-panel w-full max-w-2xl rounded-[32px] border border-cyan-500/25 p-8 shadow-2xl overflow-y-auto max-h-[85vh]">
+          <div className="glass-panel w-full max-w-2xl rounded-4xl border border-cyan-500/25 p-8 shadow-2xl overflow-y-auto max-h-[85vh]">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-black text-white font-mono">
                 {editingItem ? 'MODIFIER' : 'AJOUTER'} - {activeTab.toUpperCase()}

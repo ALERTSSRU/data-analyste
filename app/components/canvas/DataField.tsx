@@ -1,11 +1,11 @@
 'use client';
 
+import { phaseFromProgress, sceneState } from '@/lib/scene-state';
 import { Line, PointMaterial, Points, Preload } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Bloom, EffectComposer } from '@react-three/postprocessing';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { phaseFromProgress, sceneState } from '@/lib/scene-state';
 
 // ─── CONSTANTS ───────────────────────────────
 const COUNT        = 1200; // Reduced count slightly for high CPU/GPU performance (looks identical but runs 2x faster)
@@ -73,9 +73,18 @@ function lerpBuf(out: Float32Array, a: Float32Array, b: Float32Array, t: number)
   for (let i = 0; i < out.length; i++) out[i] = a[i] + (b[i] - a[i]) * t;
 }
 
+// ─── COLOR CYCLING BY PHASE ──────────────────
+function getPhaseColor(progress: number): string {
+  if (progress < 0.22) return '#22d3ee'; // Hero: Cyan
+  if (progress < 0.48) return '#0ea5e9'; // School: Sky blue
+  if (progress < 0.74) return '#34d399'; // Bank: Emerald
+  return '#c4b5fd'; // Signal: Violet
+}
+
 // ─── DATA STREAMS ────────────────────────────
 function DataStreams({ progressRef }: { progressRef: React.MutableRefObject<number> }) {
   const COLS = ['#22d3ee', '#34d399', '#c4b5fd', '#60a5fa', '#f472b6', '#67e8f9', '#a78bfa'];
+  const TRAIL_COLS = ['#0ea5e9', '#10b981', '#a78bfa', '#3b82f6']; // Darker trail colors
 
   const streams = useMemo(() => {
     return Array.from({ length: STREAM_COUNT }, (_, i) => {
@@ -95,6 +104,7 @@ function DataStreams({ progressRef }: { progressRef: React.MutableRefObject<numb
         curve:  new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5),
         speed:  0.035 + Math.random() * 0.10,
         color:  COLS[i % COLS.length],
+        trailColor: TRAIL_COLS[i % TRAIL_COLS.length],
         offset: Math.random(),
         width:  1.0 + Math.random() * 1.4,
       };
@@ -102,6 +112,8 @@ function DataStreams({ progressRef }: { progressRef: React.MutableRefObject<numb
   }, []);
 
   const lineRefs = useRef<Array<THREE.Line | null>>([]);
+  const trailRefs = useRef<Array<THREE.Line | null>>([]);
+  const particleRefs = useRef<Array<THREE.Points | null>>([]);
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
@@ -113,26 +125,72 @@ function DataStreams({ progressRef }: { progressRef: React.MutableRefObject<numb
     );
 
     streams.forEach((s, i) => {
+      // ─── MAIN STREAM LINE (fast head) ───
       const mesh = lineRefs.current[i];
-      if (!mesh) return;
-      const head  = ((t * s.speed + s.offset) % 1.0);
-      const tail  = Math.max(0, head - 0.32);
-      const STEPS = 22;
+      if (mesh) {
+        const head  = ((t * s.speed + s.offset) % 1.0);
+        const tail  = Math.max(0, head - 0.15);
+        const STEPS = 22;
 
-      // WebGL Optimization: reuse arrays and update existing buffer attributes directly
-      const geo = mesh.geometry as THREE.BufferGeometry;
-      const posAttr = geo.getAttribute('position') as THREE.BufferAttribute;
-      const arr = posAttr.array as Float32Array;
+        const geo = mesh.geometry as THREE.BufferGeometry;
+        const posAttr = geo.getAttribute('position') as THREE.BufferAttribute;
+        const arr = posAttr.array as Float32Array;
 
-      for (let k = 0; k <= STEPS; k++) {
-        const u = tail + (head - tail) * (k / STEPS);
-        const pt = s.curve.getPoint(THREE.MathUtils.clamp(u, 0, 1));
-        arr[k * 3] = pt.x; arr[k * 3 + 1] = pt.y; arr[k * 3 + 2] = pt.z;
+        for (let k = 0; k <= STEPS; k++) {
+          const u = tail + (head - tail) * (k / STEPS);
+          const pt = s.curve.getPoint(THREE.MathUtils.clamp(u, 0, 1));
+          arr[k * 3] = pt.x; arr[k * 3 + 1] = pt.y; arr[k * 3 + 2] = pt.z;
+        }
+        posAttr.needsUpdate = true;
+        geo.computeBoundingSphere();
+
+        const mat = mesh.material as THREE.LineBasicMaterial;
+        mat.opacity = pulse * (0.65 + Math.sin(t * 1.2 + i) * 0.25); // Increased visibility
       }
-      posAttr.needsUpdate = true;
-      geo.computeBoundingSphere();
-      const mat = mesh.material as THREE.LineBasicMaterial;
-      mat.opacity = pulse * (0.45 + Math.sin(t * 1.2 + i) * 0.25);
+
+      // ─── TRAIL LAYER (slow tracer) ───
+      const trail = trailRefs.current[i];
+      if (trail) {
+        const head  = ((t * s.speed * 0.35 + s.offset) % 1.0);
+        const tail  = Math.max(0, head - 0.45);
+        const STEPS = 22;
+
+        const geo = trail.geometry as THREE.BufferGeometry;
+        const posAttr = geo.getAttribute('position') as THREE.BufferAttribute;
+        const arr = posAttr.array as Float32Array;
+
+        for (let k = 0; k <= STEPS; k++) {
+          const u = tail + (head - tail) * (k / STEPS);
+          const pt = s.curve.getPoint(THREE.MathUtils.clamp(u, 0, 1));
+          arr[k * 3] = pt.x; arr[k * 3 + 1] = pt.y; arr[k * 3 + 2] = pt.z;
+        }
+        posAttr.needsUpdate = true;
+        geo.computeBoundingSphere();
+
+        const mat = trail.material as THREE.LineBasicMaterial;
+        mat.opacity = pulse * (0.25 + Math.sin(t * 0.8 + i) * 0.12); // Subtle trail
+      }
+
+      // ─── TRAILING PARTICLES ───
+      const particles = particleRefs.current[i];
+      if (particles) {
+        const head  = ((t * s.speed + s.offset) % 1.0);
+        const PARTICLE_COUNT = 12;
+        const positions = new Float32Array(PARTICLE_COUNT * 3);
+
+        for (let p = 0; p < PARTICLE_COUNT; p++) {
+          const ratio = p / PARTICLE_COUNT;
+          const u = THREE.MathUtils.clamp(head - ratio * 0.28, 0, 1);
+          const pt = s.curve.getPoint(u);
+          positions[p * 3] = pt.x;
+          positions[p * 3 + 1] = pt.y;
+          positions[p * 3 + 2] = pt.z;
+        }
+
+        const posAttr = particles.geometry.getAttribute('position') as THREE.BufferAttribute;
+        posAttr.array = positions;
+        posAttr.needsUpdate = true;
+      }
     });
   });
 
@@ -142,22 +200,54 @@ function DataStreams({ progressRef }: { progressRef: React.MutableRefObject<numb
         const initPts = s.curve.getPoints(22);
         const initPos = new Float32Array(initPts.length * 3);
         initPts.forEach((p, k) => { initPos[k * 3] = p.x; initPos[k * 3 + 1] = p.y; initPos[k * 3 + 2] = p.z; });
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(initPos, 3));
-        const mat = new THREE.LineBasicMaterial({
-          color: s.color, transparent: true, opacity: 0.08,
-          blending: THREE.AdditiveBlending, depthWrite: false,
-        });
-        const line = new THREE.Line(geo, mat);
-        lineRefs.current[i] = line;
-        return <primitive key={i} object={line} />;
+
+        // Main stream line
+        if (!lineRefs.current[i]) {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(initPos.slice(), 3));
+          const mat = new THREE.LineBasicMaterial({
+            color: s.color, transparent: true, opacity: 0.15,
+            blending: THREE.AdditiveBlending, depthWrite: false, linewidth: 2,
+          });
+          lineRefs.current[i] = new THREE.Line(geo, mat);
+        }
+
+        // Trail layer
+        if (!trailRefs.current[i]) {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(initPos.slice(), 3));
+          const mat = new THREE.LineBasicMaterial({
+            color: s.trailColor, transparent: true, opacity: 0.06,
+            blending: THREE.AdditiveBlending, depthWrite: false, linewidth: 1,
+          });
+          trailRefs.current[i] = new THREE.Line(geo, mat);
+        }
+
+        // Trailing particles
+        if (!particleRefs.current[i]) {
+          const pGeo = new THREE.BufferGeometry();
+          pGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12 * 3), 3));
+          const pMat = new THREE.PointsMaterial({
+            color: s.color, transparent: true, opacity: 0.45, size: 0.08,
+            blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+          });
+          particleRefs.current[i] = new THREE.Points(pGeo, pMat);
+        }
+
+        return (
+          <group key={i}>
+            <primitive object={lineRefs.current[i]!} />
+            <primitive object={trailRefs.current[i]!} />
+            <primitive object={particleRefs.current[i]!} />
+          </group>
+        );
       })}
     </group>
   );
 }
 
 // ─── FLOATING GLYPHS ─────────────────────────
-function FloatingGlyphs() {
+function FloatingGlyphs({ progressRef }: { progressRef: React.MutableRefObject<number> }) {
   const LABELS = [
     'SELECT *', 'GROUP BY', 'AVG(score)', 'JOIN ON', 'WHERE id=',
     '01001101', '0xFF3A', 'NULL', 'ETL', 'PIPELINE',
@@ -165,7 +255,13 @@ function FloatingGlyphs() {
     'BigQuery', 'Apache Spark', 'Kafka', 'dbt', 'Airflow',
     'TensorFlow', '∂f/∂x', 'λ=0.01', 'Δσ', 'KPI', 'ROI',
   ];
-  const COLS = ['#22d3ee', '#34d399', '#c4b5fd', '#60a5fa', '#94a3b8'];
+  // Color palette per phase
+  const PHASE_COLS = {
+    hero: ['#22d3ee', '#60a5fa', '#0ea5e9', '#38bdf8'],
+    school: ['#0ea5e9', '#38bdf8', '#22d3ee', '#60a5fa'],
+    bank: ['#34d399', '#10b981', '#6ee7b7', '#13b0b9'],
+    signal: ['#c4b5fd', '#a78bfa', '#f0abfc', '#e879f9'],
+  };
 
   const glyphs = useMemo(() => Array.from({ length: GLYPH_COUNT }, (_, i) => ({
     pos: new THREE.Vector3((Math.random() - 0.5) * 22, (Math.random() - 0.5) * 13, -3 - Math.random() * 9),
@@ -179,9 +275,12 @@ function FloatingGlyphs() {
     canvas.width = 320; canvas.height = 64;
     const ctx = canvas.getContext('2d')!;
     ctx.font = 'bold 27px "Courier New",monospace';
-    ctx.fillStyle = COLS[i % COLS.length];
-    ctx.globalAlpha = 0.9;
+    ctx.globalAlpha = 0.95;
+
+    // Start with hero color
+    ctx.fillStyle = PHASE_COLS.hero[i % PHASE_COLS.hero.length];
     ctx.fillText(g.label, 6, 44);
+
     const tex = new THREE.CanvasTexture(canvas);
     tex.needsUpdate = true;
     return tex;
@@ -191,13 +290,33 @@ function FloatingGlyphs() {
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
+    const p = progressRef.current;
+
+    // Determine phase colors
+    let currentColors: string[];
+    if (p < 0.22) currentColors = PHASE_COLS.hero;
+    else if (p < 0.48) currentColors = PHASE_COLS.school;
+    else if (p < 0.74) currentColors = PHASE_COLS.bank;
+    else currentColors = PHASE_COLS.signal;
+
     glyphs.forEach((g, i) => {
       const m = meshRefs.current[i];
       if (!m) return;
+
       g.pos.y -= g.speed * 0.006;
       if (g.pos.y < -8) { g.pos.y = 8; g.pos.x = (Math.random() - 0.5) * 22; }
-      m.position.set(g.pos.x + Math.sin(t * 0.3 + g.phase) * 0.18, g.pos.y, g.pos.z);
-      (m.material as THREE.MeshBasicMaterial).opacity = 0.035 + Math.abs(Math.sin(t * 0.22 + g.phase)) * 0.11;
+
+      // Enhanced motion - more visible drift
+      m.position.set(
+        g.pos.x + Math.sin(t * 0.3 + g.phase) * 0.28,
+        g.pos.y,
+        g.pos.z + Math.cos(t * 0.25 + g.phase) * 0.15
+      );
+
+      // Much higher base opacity for better visibility
+      const baseOpacity = 0.18 + Math.abs(Math.sin(t * 0.22 + g.phase)) * 0.22;
+      const pulseFactor = 0.8 + Math.sin(t * 0.5 + i * 0.3) * 0.2; // Added subtle pulse
+      (m.material as THREE.MeshBasicMaterial).opacity = baseOpacity * pulseFactor;
     });
   });
 
@@ -206,7 +325,7 @@ function FloatingGlyphs() {
       {glyphs.map((g, i) => (
         <mesh key={i} ref={(el) => { if (el) meshRefs.current[i] = el; }} position={g.pos}>
           <planeGeometry args={[2.8, 0.62]} />
-          <meshBasicMaterial map={sprites[i]} transparent opacity={0.07}
+          <meshBasicMaterial map={sprites[i]} transparent opacity={0.22}
             depthWrite={false} blending={THREE.AdditiveBlending} />
         </mesh>
       ))}
@@ -320,7 +439,7 @@ function DataMorph() {
 
     // ── GPU Performance Optimization: only calculate morph and write to GPU if user actually scrolls! ──
     const isScrolling = Math.abs(p - lastP.current) > 0.0005;
-    
+
     if (isScrolling) {
       lastP.current = p;
       const s2k = smoothEase(0.18, 0.48, p);
@@ -506,7 +625,7 @@ function DataMorph() {
       <DataStreams progressRef={progressRef} />
 
       {/* Floating analytics glyphs */}
-      <FloatingGlyphs />
+      <FloatingGlyphs progressRef={progressRef} />
 
       {/* ── MODEL 1: Neural Constellation Sphere ── */}
       <group ref={schoolGroup}>
@@ -593,8 +712,8 @@ export function DataField() {
   return (
     <div className="pointer-events-none absolute inset-0">
       {/* WebGL Performance Fix: removed dark solid background color so HTML background transitions display instantly in light/dark theme. Add pointerEvents none. */}
-      <Canvas 
-        camera={{ position: [0, 0.2, 9.5], fov: 50 }} 
+      <Canvas
+        camera={{ position: [0, 0.2, 9.5], fov: 50 }}
         dpr={[1, 1.5]}
         gl={{ antialias: true, alpha: true }}
         style={{ pointerEvents: 'none' }}
