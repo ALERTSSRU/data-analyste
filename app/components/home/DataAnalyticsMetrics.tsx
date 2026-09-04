@@ -1,42 +1,78 @@
 'use client';
 
+import type { PortfolioMetric } from '@/lib/portfolio';
 import { Activity, BarChart3, Database, HardDrive, Zap } from 'lucide-react';
 
-export function DataAnalyticsMetrics() {
-  const metrics = [
+interface DataAnalyticsMetricsProps {
+  customMetrics?: PortfolioMetric[];
+  counts?: {
+    projects: number;
+    experiences: number;
+    skills: number;
+    certifications: number;
+  };
+}
+
+export function DataAnalyticsMetrics({ customMetrics, counts }: DataAnalyticsMetricsProps) {
+  const pCount = counts?.projects ?? 0;
+  const eCount = counts?.experiences ?? 0;
+  const sCount = counts?.skills ?? 0;
+  const cCount = counts?.certifications ?? 0;
+  // Real metrics computed from database counts as default baseline
+  const defaultRealMetrics = [
     {
-      label: 'Précision des Données',
-      value: '99.8%',
-      change: '+4.2% ce mois',
+      label: 'Projets Data Livrés',
+      value: `${pCount || 0}`,
+      change: '100% Fonctionnels',
       icon: Database,
       accent: 'from-cyan-500 to-blue-500',
-      description: 'Tests de qualité & validation automatisée des pipelines ETL',
+      description: 'Dashboards BI, modélisation SQL et pipelines de données en production',
     },
     {
-      label: 'Volumétrie Traitée',
-      value: '12M+',
-      change: 'Lignes unifiées',
+      label: 'Expériences & Postes',
+      value: `${eCount || 0}`,
+      change: 'Parcours Pro',
       icon: HardDrive,
       accent: 'from-emerald-500 to-teal-500',
-      description: 'Entrepôts de données SQL & agrégation multi-sources',
+      description: 'Banque, finance et projets indépendants d’analyse décisionnelle',
     },
     {
-      label: 'Temps de Réponse SQL',
-      value: '< 15ms',
-      change: 'Indexation optimale',
+      label: 'Arsenal Technologique',
+      value: `${sCount || 0}`,
+      change: 'Outils maîtrisés',
       icon: Zap,
       accent: 'from-amber-500 to-orange-500',
-      description: 'Requêtes optimisées & modélisation dimensionnelle',
+      description: 'SQL, Python, PowerBI, Supabase, ETL et delivery Full Stack',
     },
     {
-      label: 'Disponibilité Pipelines',
-      value: '100%',
-      change: 'Monitoring actif',
+      label: 'Certifications Validées',
+      value: `${cCount || 0}`,
+      change: 'Spécialisations',
       icon: Activity,
       accent: 'from-violet-500 to-purple-500',
-      description: 'Alertes automatisées & monitoring de performance en continu',
+      description: 'KPIs, Data Analysis Professional Track et validation métier',
     },
   ];
+
+  // If admin has created custom metrics in DB, render those instead
+  const displayMetrics =
+    customMetrics && customMetrics.length > 0
+      ? customMetrics.map((cm, idx) => ({
+          label: cm.label,
+          value: cm.value,
+          change: cm.change || 'Métrique réelle',
+          icon: idx % 4 === 0 ? Database : idx % 4 === 1 ? HardDrive : idx % 4 === 2 ? Zap : Activity,
+          accent:
+            idx % 4 === 0
+              ? 'from-cyan-500 to-blue-500'
+              : idx % 4 === 1
+              ? 'from-emerald-500 to-teal-500'
+              : idx % 4 === 2
+              ? 'from-amber-500 to-orange-500'
+              : 'from-violet-500 to-purple-500',
+          description: cm.description || 'Donnée réelle d’analyse métier',
+        }))
+      : defaultRealMetrics;
 
   const skillBars = [
     { name: 'SQL & Modélisation de Données (PostgreSQL, Snowflake)', level: 98, color: 'bg-cyan-400' },
@@ -53,21 +89,21 @@ export function DataAnalyticsMetrics() {
           <div>
             <span className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-cyan-300 font-mono font-bold">
               <BarChart3 className="w-4 h-4 text-cyan-400" />
-              <span>Indicateurs de Performance Data</span>
+              <span>Indicateurs & Données Réelles</span>
             </span>
             <h2 className="mt-3 text-2xl sm:text-4xl font-black tracking-tight" style={{ color: 'var(--foreground)' }}>
-              Métriques & Analyse d'Impact
+              Métriques d'Impact Portfolio
             </h2>
           </div>
           <div className="px-3.5 py-1.5 rounded-full border border-cyan-400/30 bg-cyan-500/10 text-cyan-200 text-xs font-mono font-semibold flex items-center gap-2 w-fit">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Moteur d'Analyse Actif</span>
+            <span>Données Synchronisées en Direct</span>
           </div>
         </div>
 
         {/* 4 KPI Grid Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          {metrics.map((m, idx) => {
+          {displayMetrics.map((m, idx) => {
             const IconComp = m.icon;
             return (
               <div

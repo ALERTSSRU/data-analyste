@@ -4,13 +4,29 @@ import { phaseFromProgress, sceneState } from '@/lib/scene-state';
 import { Line, PointMaterial, Points, Preload } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Bloom, EffectComposer } from '@react-three/postprocessing';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
-// ─── CONSTANTS ───────────────────────────────
-const COUNT        = 1200; // Reduced count slightly for high CPU/GPU performance (looks identical but runs 2x faster)
-const STREAM_COUNT = 24;   // Optimized count
-const GLYPH_COUNT  = 35;   // Optimized count
+// ─── PERFORMANCE TIER DETECTION ──────────────
+export type PerfTier = 'low' | 'medium' | 'high';
+
+export function detectPerfTier(): PerfTier {
+  if (typeof window === 'undefined') return 'high';
+
+  const cores = navigator.hardwareConcurrency || 4;
+  const ua = navigator.userAgent.toLowerCase();
+  const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua);
+  const isOldDevice = /android [1-9]\.|android 10\.|iphone os (10|11|12|13|14)_/i.test(ua);
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (prefersReduced || isOldDevice || (isMobile && cores <= 4) || cores <= 2) {
+    return 'low';
+  }
+  if (isMobile || cores <= 6) {
+    return 'medium';
+  }
+  return 'high';
+}
 
 // ─── EASING ──────────────────────────────────
 function easeInOut(t: number) {
@@ -26,9 +42,9 @@ function smoothstep(edge0: number, edge1: number, x: number) {
 }
 
 // ─── PARTICLE SHAPES ─────────────────────────
-function fillSphere(target: Float32Array, radius: number) {
-  for (let i = 0; i < COUNT; i++) {
-    const phi   = Math.acos(1 - (2 * (i + 0.5)) / COUNT);
+function fillSphere(target: Float32Array, radius: number, count: number) {
+  for (let i = 0; i < count; i++) {
+    const phi   = Math.acos(1 - (2 * (i + 0.5)) / count);
     const theta = Math.PI * (1 + Math.sqrt(5)) * i;
     const j = (Math.random() - 0.5) * 0.25;
     target[i * 3]     = (radius + j) * Math.sin(phi) * Math.cos(theta);
@@ -36,10 +52,10 @@ function fillSphere(target: Float32Array, radius: number) {
     target[i * 3 + 2] = (radius + j) * Math.cos(phi);
   }
 }
-function fillTorusKnot(target: Float32Array) {
+function fillTorusKnot(target: Float32Array, count: number) {
   const p = 3, q = 5;
-  for (let i = 0; i < COUNT; i++) {
-    const u = (i / COUNT) * Math.PI * 2 * p;
+  for (let i = 0; i < count; i++) {
+    const u = (i / count) * Math.PI * 2 * p;
     const r = Math.cos(q * u / p) + 2.4;
     const j = (Math.random() - 0.5) * 0.14;
     target[i * 3]     = r * Math.cos(u) + j;
@@ -47,20 +63,20 @@ function fillTorusKnot(target: Float32Array) {
     target[i * 3 + 2] = -Math.sin(q * u / p) * 1.1 + j;
   }
 }
-function fillHelixFlow(target: Float32Array) {
-  for (let i = 0; i < COUNT; i++) {
+function fillHelixFlow(target: Float32Array, count: number) {
+  for (let i = 0; i < count; i++) {
     const strand = i % 3;
-    const u      = (i / COUNT) * Math.PI * 14;
+    const u      = (i / count) * Math.PI * 14;
     const offset = (strand * Math.PI * 2) / 3;
     const r      = 1.55 + Math.sin(u * 0.4) * 0.18;
     target[i * 3]     = r * Math.cos(u + offset);
-    target[i * 3 + 1] = (i / COUNT - 0.5) * 5.2;
+    target[i * 3 + 1] = (i / count - 0.5) * 5.2;
     target[i * 3 + 2] = r * Math.sin(u + offset);
   }
 }
-function fillAligned(target: Float32Array) {
+function fillAligned(target: Float32Array, count: number) {
   const centers: [number, number, number][] = [[-3.4, 0.1, 0], [0, 0, 0], [3.4, -0.1, 0]];
-  for (let i = 0; i < COUNT; i++) {
+  for (let i = 0; i < count; i++) {
     const [cx, cy, cz] = centers[i % 3];
     const a = Math.random() * Math.PI * 2;
     const r = 0.28 + Math.random() * 0.62;
@@ -82,13 +98,13 @@ function getPhaseColor(progress: number): string {
 }
 
 // ─── DATA STREAMS ────────────────────────────
-function DataStreams({ progressRef }: { progressRef: React.MutableRefObject<number> }) {
+function DataStreams({ progressRef, streamCount = 24 }: { progressRef: React.MutableRefObject<number>; streamCount?: number }) {
   const COLS = ['#22d3ee', '#34d399', '#c4b5fd', '#60a5fa', '#f472b6', '#67e8f9', '#a78bfa'];
   const TRAIL_COLS = ['#0ea5e9', '#10b981', '#a78bfa', '#3b82f6']; // Darker trail colors
 
   const streams = useMemo(() => {
-    return Array.from({ length: STREAM_COUNT }, (_, i) => {
-      const angle  = (i / STREAM_COUNT) * Math.PI * 2;
+    return Array.from({ length: streamCount }, (_, i) => {
+      const angle  = (i / streamCount) * Math.PI * 2;
       const radius = 3.8 + Math.random() * 3.0;
       const ySpan  = (Math.random() - 0.5) * 8;
       const twist  = Math.random() * Math.PI * 3;
@@ -109,7 +125,7 @@ function DataStreams({ progressRef }: { progressRef: React.MutableRefObject<numb
         width:  1.0 + Math.random() * 1.4,
       };
     });
-  }, []);
+  }, [streamCount]);
 
   const lineRefs = useRef<Array<THREE.Line | null>>([]);
   const trailRefs = useRef<Array<THREE.Line | null>>([]);
@@ -247,7 +263,7 @@ function DataStreams({ progressRef }: { progressRef: React.MutableRefObject<numb
 }
 
 // ─── FLOATING GLYPHS ─────────────────────────
-function FloatingGlyphs({ progressRef }: { progressRef: React.MutableRefObject<number> }) {
+function FloatingGlyphs({ progressRef, glyphCount = 35 }: { progressRef: React.MutableRefObject<number>; glyphCount?: number }) {
   const LABELS = [
     'SELECT *', 'GROUP BY', 'AVG(score)', 'JOIN ON', 'WHERE id=',
     '01001101', '0xFF3A', 'NULL', 'ETL', 'PIPELINE',
@@ -263,12 +279,12 @@ function FloatingGlyphs({ progressRef }: { progressRef: React.MutableRefObject<n
     signal: ['#c4b5fd', '#a78bfa', '#f0abfc', '#e879f9'],
   };
 
-  const glyphs = useMemo(() => Array.from({ length: GLYPH_COUNT }, (_, i) => ({
+  const glyphs = useMemo(() => Array.from({ length: glyphCount }, (_, i) => ({
     pos: new THREE.Vector3((Math.random() - 0.5) * 22, (Math.random() - 0.5) * 13, -3 - Math.random() * 9),
     speed: 0.035 + Math.random() * 0.07,
     phase: Math.random() * Math.PI * 2,
     label: LABELS[i % LABELS.length],
-  })), []); // eslint-disable-line react-hooks/exhaustive-deps
+  })), [glyphCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sprites = useMemo(() => glyphs.map((g, i) => {
     const canvas = document.createElement('canvas');
@@ -336,7 +352,11 @@ function FloatingGlyphs({ progressRef }: { progressRef: React.MutableRefObject<n
 // ─────────────────────────────────────────────
 // SINGLE MONOLITHIC SCENE ORCHESTRATOR
 // ─────────────────────────────────────────────
-function DataMorph() {
+function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
+  const count = tier === 'low' ? 450 : tier === 'medium' ? 800 : 1200;
+  const streamCount = tier === 'low' ? 8 : tier === 'medium' ? 16 : 24;
+  const glyphCount = tier === 'low' ? 12 : tier === 'medium' ? 22 : 35;
+
   const progressRef = useRef(0);
   const lastP = useRef(-1);
 
@@ -379,18 +399,18 @@ function DataMorph() {
   const colC = useMemo(() => new THREE.Color('#c4b5fd'), []);
 
   const buffers = useMemo(() => {
-    const sphere  = new Float32Array(COUNT * 3);
-    const knot    = new Float32Array(COUNT * 3);
-    const helix   = new Float32Array(COUNT * 3);
-    const aligned = new Float32Array(COUNT * 3);
-    const current = new Float32Array(COUNT * 3);
-    fillSphere(sphere, 3.5);
-    fillTorusKnot(knot);
-    fillHelixFlow(helix);
-    fillAligned(aligned);
+    const sphere  = new Float32Array(count * 3);
+    const knot    = new Float32Array(count * 3);
+    const helix   = new Float32Array(count * 3);
+    const aligned = new Float32Array(count * 3);
+    const current = new Float32Array(count * 3);
+    fillSphere(sphere, 3.5, count);
+    fillTorusKnot(knot, count);
+    fillHelixFlow(helix, count);
+    fillAligned(aligned, count);
     current.set(sphere);
     return { sphere, knot, helix, aligned, current };
-  }, []);
+  }, [count]);
 
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry();
@@ -457,7 +477,7 @@ function DataMorph() {
       const attr = geometry.getAttribute('position') as THREE.BufferAttribute;
       const arr  = attr.array as Float32Array;
 
-      for (let i = 0; i < COUNT; i++) {
+      for (let i = 0; i < count; i++) {
         const idx = i * 3;
         // Apply smooth spiral displacement
         const angle = i * 0.06 + t * 0.8;
@@ -634,10 +654,10 @@ function DataMorph() {
       </Points>
 
       {/* Data streams */}
-      <DataStreams progressRef={progressRef} />
+      <DataStreams progressRef={progressRef} streamCount={streamCount} />
 
       {/* Floating analytics glyphs */}
-      <FloatingGlyphs progressRef={progressRef} />
+      <FloatingGlyphs progressRef={progressRef} glyphCount={glyphCount} />
 
       {/* ── MODEL 1: Neural Constellation Sphere ── */}
       <group ref={schoolGroup}>
@@ -721,13 +741,22 @@ function DataMorph() {
 
 // ─── EXPORTED CANVAS ─────────────────────────
 export function DataField() {
+  const [tier, setTier] = useState<PerfTier>('high');
+
+  useEffect(() => {
+    setTier(detectPerfTier());
+  }, []);
+
+  const dpr: [number, number] = tier === 'low' ? [1, 1] : tier === 'medium' ? [1, 1.25] : [1, 1.5];
+  const enableBloom = tier !== 'low';
+  const bloomIntensity = tier === 'medium' ? 0.8 : 1.4;
+
   return (
     <div className="pointer-events-none absolute inset-0">
-      {/* WebGL Performance Fix: removed dark solid background color so HTML background transitions display instantly in light/dark theme. Add pointerEvents none. */}
       <Canvas
         camera={{ position: [0, 0.2, 9.5], fov: 50 }}
-        dpr={[1, 1.5]}
-        gl={{ antialias: true, alpha: true }}
+        dpr={dpr}
+        gl={{ antialias: tier !== 'low', alpha: true, powerPreference: 'high-performance' }}
         style={{ pointerEvents: 'none' }}
       >
         <ambientLight intensity={0.22} />

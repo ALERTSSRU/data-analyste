@@ -9,6 +9,7 @@ import {
     type PortfolioCertification,
     type PortfolioEducation,
     type PortfolioExperience,
+    type PortfolioMetric,
     type PortfolioProfile,
     type PortfolioProject,
     type PortfolioSkill,
@@ -28,6 +29,7 @@ type HomeJourneyProps = {
   projects: PortfolioProject[];
   certifications: PortfolioCertification[];
   skills: PortfolioSkill[];
+  metrics?: PortfolioMetric[];
 };
 
 export function HomeJourney({
@@ -37,6 +39,7 @@ export function HomeJourney({
   projects,
   certifications,
   skills,
+  metrics,
 }: HomeJourneyProps) {
   const { t } = useLanguage();
   const bankRoles = experiences.filter(isBankExperience);
@@ -106,7 +109,15 @@ export function HomeJourney({
       </section>
 
       {/* Data Analytics & Statistical Metrics Section */}
-      <DataAnalyticsMetrics />
+      <DataAnalyticsMetrics
+        customMetrics={metrics}
+        counts={{
+          projects: projects.length,
+          experiences: experiences.length,
+          skills: skills.length,
+          certifications: certifications.length,
+        }}
+      />
 
       <section data-scene="school" className="relative mx-auto max-w-6xl px-4 sm:px-8 md:px-10 py-16 sm:py-24 md:py-32">
         <ScrollReveal>

@@ -53,6 +53,15 @@ export type PortfolioCertification = {
   description: string;
 };
 
+export type PortfolioMetric = {
+  id?: string;
+  label: string;
+  value: string;
+  change?: string;
+  description?: string;
+  icon_type?: string;
+};
+
 export type PortfolioSkill = {
   id?: string;
   name: string;
@@ -410,6 +419,26 @@ export async function getSkills(): Promise<PortfolioSkill[]> {
   } catch {
     return fallbackSkills;
   }
+}
+
+export async function getMetrics(): Promise<PortfolioMetric[]> {
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase.from('metrics').select('*').order('created_at', { ascending: true });
+    if (!error && data && data.length > 0) {
+      return data.map((m) => ({
+        id: m.id,
+        label: m.label,
+        value: m.value,
+        change: m.change,
+        description: m.description,
+        icon_type: m.icon_type,
+      }));
+    }
+  } catch {}
+
+  return [];
 }
 
 export function isBankExperience(experience: PortfolioExperience) {

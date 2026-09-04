@@ -4,7 +4,9 @@ import { supabase } from '@/lib/portfolio';
 import { translateFrToEn } from '@/lib/translate';
 import {
   Award,
+  BarChart3,
   Briefcase,
+  Edit3,
   ExternalLink,
   FolderKanban,
   GraduationCap,
@@ -22,7 +24,6 @@ import {
   Trash2,
   User,
   Wrench,
-  Edit3,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -48,7 +49,7 @@ export default function AdminPage() {
 
   // Active dashboard tab
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'projects' | 'experiences' | 'education' | 'skills' | 'certifications' | 'profile' | 'security'
+    'overview' | 'projects' | 'experiences' | 'education' | 'skills' | 'certifications' | 'metrics' | 'profile' | 'security'
   >('overview');
 
   // Security Credentials form state
@@ -66,6 +67,7 @@ export default function AdminPage() {
   const [education, setEducation] = useState<any[]>([]);
   const [skills, setSkills] = useState<any[]>([]);
   const [certifications, setCertifications] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
 
@@ -195,6 +197,7 @@ export default function AdminPage() {
         { data: skillsData },
         { data: certificationsData },
         { data: categoriesData },
+        { data: metricsData },
       ] = await Promise.all([
         supabase.from('projects').select('*').order('created_at', { ascending: false }),
         supabase.from('experiences').select('*').order('start_date', { ascending: false }),
@@ -202,6 +205,7 @@ export default function AdminPage() {
         supabase.from('skills').select('*').order('name', { ascending: true }),
         supabase.from('certifications').select('*').order('issue_date', { ascending: false }),
         supabase.from('categories').select('*').order('name', { ascending: true }),
+        supabase.from('metrics').select('*').order('created_at', { ascending: true }),
       ]);
 
       const projectsList = projectsData || [];
@@ -209,12 +213,14 @@ export default function AdminPage() {
       const educationList = educationData || [];
       const skillsList = skillsData || [];
       const certificationsList = certificationsData || [];
+      const metricsList = metricsData || [];
 
       setProjects(projectsList);
       setExperiences(experiencesList);
       setEducation(educationList);
       setSkills(skillsList);
       setCertifications(certificationsList);
+      setMetrics(metricsList);
       setCategories(categoriesData || []);
 
       setCounts({
@@ -636,6 +642,13 @@ export default function AdminPage() {
       c.issuer?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const filteredMetrics = metrics.filter(
+    (m) =>
+      m.label?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.value?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-[#060913] text-slate-100 font-sans pb-24">
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
@@ -696,6 +709,7 @@ export default function AdminPage() {
             { id: 'education', label: 'Formations', count: counts.education, Icon: GraduationCap },
             { id: 'skills', label: 'Compétences', count: counts.skills, Icon: Wrench },
             { id: 'certifications', label: 'Certifications', count: counts.certifications, Icon: Award },
+            { id: 'metrics', label: 'Métriques & KPIs', count: metrics.length, Icon: BarChart3 },
             { id: 'profile', label: 'Profil', Icon: User },
             { id: 'security', label: 'Sécurité & Identifiants', Icon: KeyRound },
           ].map((tab) => {
@@ -1077,6 +1091,67 @@ export default function AdminPage() {
                       </button>
                       <button
                         onClick={() => requestDelete('certifications', c.id, c.title)}
+                        className="px-3 py-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 transition flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Supprimer</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* METRICS & KPIS TAB */}
+        {activeTab === 'metrics' && (
+          <div className="space-y-4 animate-fadeIn">
+            {filteredMetrics.length === 0 ? (
+              <div className="text-center py-16 bg-[#0a0f1d] rounded-2xl border border-slate-800 space-y-3">
+                <BarChart3 className="w-8 h-8 mx-auto text-slate-500" />
+                <h3 className="text-sm font-bold text-white">Aucune métrique personnalisée</h3>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  Par défaut, les 4 métriques réelles calculées depuis votre base (projets, expériences, compétences, certifications) sont affichées sur votre portfolio. Ajoutez une métrique personnalisée ci-dessous pour surcharger l'affichage.
+                </p>
+                <button
+                  onClick={() => openForm()}
+                  className="px-4 py-2 rounded-xl bg-cyan-500 text-slate-950 font-bold text-xs hover:bg-cyan-400 transition"
+                >
+                  + Ajouter une métrique / KPI
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {filteredMetrics.map((m) => (
+                  <div
+                    key={m.id}
+                    className="rounded-2xl border border-slate-800 bg-[#0a0f1d] p-5 flex flex-col justify-between space-y-4 shadow-lg hover:border-slate-700 transition"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-cyan-400 font-mono bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                          {m.change || 'KPI Réel'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">{m.icon_type || 'database'}</span>
+                      </div>
+                      <h3 className="text-2xl font-black text-white font-mono mt-1">{m.value}</h3>
+                      <p className="text-xs font-bold text-slate-200">{m.label}</p>
+                      {m.description && (
+                        <p className="text-[11px] text-slate-400 leading-relaxed">{m.description}</p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80">
+                      <button
+                        onClick={() => openForm(m)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-700/80 bg-slate-800/60 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition flex items-center gap-1"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Éditer</span>
+                      </button>
+                      <button
+                        onClick={() => requestDelete('metrics', m.id, m.label)}
                         className="px-3 py-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 transition flex items-center gap-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1735,6 +1810,83 @@ export default function AdminPage() {
                         className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
                       />
                     </div>
+                  </div>
+                </>
+              )}
+
+              {/* METRICS FORM FIELDS */}
+              {activeTab === 'metrics' && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                        Intitulé du KPI / Métrique *
+                      </label>
+                      <input
+                        type="text"
+                        name="label"
+                        required
+                        defaultValue={editingItem?.label || ''}
+                        placeholder="ex: Projets Data Livrés"
+                        className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                        Valeur / Chiffre Clé *
+                      </label>
+                      <input
+                        type="text"
+                        name="value"
+                        required
+                        defaultValue={editingItem?.value || ''}
+                        placeholder="ex: 12 ou 98%"
+                        className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                        Sous-titre / Tendance
+                      </label>
+                      <input
+                        type="text"
+                        name="change"
+                        defaultValue={editingItem?.change || ''}
+                        placeholder="ex: 100% Fonctionnels"
+                        className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                        Type d'icône
+                      </label>
+                      <select
+                        name="icon_type"
+                        defaultValue={editingItem?.icon_type || 'database'}
+                        className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                      >
+                        <option value="database">Database (Base de Données)</option>
+                        <option value="hard-drive">HardDrive (Stockage & Expériences)</option>
+                        <option value="zap">Zap (Arsenal & Outils)</option>
+                        <option value="activity">Activity (Certifications & KPIs)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                      Description explicative
+                    </label>
+                    <textarea
+                      name="description"
+                      rows={3}
+                      defaultValue={editingItem?.description || ''}
+                      placeholder="Contextualisation et détails de la métrique..."
+                      className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                    />
                   </div>
                 </>
               )}

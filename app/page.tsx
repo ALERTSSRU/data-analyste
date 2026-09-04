@@ -2,16 +2,17 @@
 export const dynamic = 'force-dynamic';
 
 import { HomeJourney } from '@/app/components/home/HomeJourney';
-import { getCertifications, getEducation, getExperiences, getProfile, getProjects, getSkills } from '@/lib/portfolio';
+import { getCertifications, getEducation, getExperiences, getMetrics, getProfile, getProjects, getSkills } from '@/lib/portfolio';
 
 export default async function Home() {
-  const [profile, education, experiences, projects, certifications, skills] = await Promise.all([
+  const [profile, education, experiences, projects, certifications, skills, metrics] = await Promise.all([
     getProfile(),
     getEducation(),
     getExperiences(),
     getProjects(),
     getCertifications(),
     getSkills(),
+    getMetrics(),
   ]);
 
   return (
@@ -22,6 +23,7 @@ export default async function Home() {
       projects={projects}
       certifications={certifications}
       skills={skills}
+      metrics={metrics}
     />
   );
 }
