@@ -8,12 +8,15 @@ import {
   ExternalLink,
   FolderKanban,
   GraduationCap,
+  KeyRound,
   LayoutDashboard,
   Lock,
   LogOut,
+  Mail,
   Plus,
   Save,
   Search,
+  Shield,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -45,8 +48,14 @@ export default function AdminPage() {
 
   // Active dashboard tab
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'projects' | 'experiences' | 'education' | 'skills' | 'certifications' | 'profile'
+    'overview' | 'projects' | 'experiences' | 'education' | 'skills' | 'certifications' | 'profile' | 'security'
   >('overview');
+
+  // Security Credentials form state
+  const [newLoginEmail, setNewLoginEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [secLoading, setSecLoading] = useState(false);
 
   // Search filter query
   const [searchQuery, setSearchQuery] = useState('');
@@ -284,6 +293,75 @@ export default function AdminPage() {
       await fetch('/api/revalidate', { method: 'POST' });
     } catch {}
     router.refresh();
+  };
+
+  // Update Login Email
+  const handleUpdateEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || !user) return;
+
+    if (!newLoginEmail || newLoginEmail.trim() === '') {
+      addToast('warning', 'Email requis', 'Veuillez saisir une adresse email valide.');
+      return;
+    }
+
+    if (newLoginEmail === user.email) {
+      addToast('info', 'Aucune modification', 'L’adresse email saisie est identique à votre email actuel.');
+      return;
+    }
+
+    setSecLoading(true);
+    try {
+      const { data, error } = await supabase.auth.updateUser({ email: newLoginEmail });
+      if (error) {
+        addToast('error', 'Échec de mise à jour', error.message);
+      } else {
+        addToast(
+          'success',
+          'Email mis à jour',
+          'Votre adresse email de connexion a été modifiée avec succès.'
+        );
+        if (data.user?.email) {
+          setUser({ ...user, email: data.user.email });
+        }
+      }
+    } catch (err: any) {
+      addToast('error', 'Erreur', err.message || 'Impossible de mettre à jour l’email.');
+    } finally {
+      setSecLoading(false);
+    }
+  };
+
+  // Update Login Password
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || !user) return;
+
+    if (!newPassword || newPassword.length < 6) {
+      addToast('warning', 'Mot de passe trop court', 'Le nouveau mot de passe doit contenir au moins 6 caractères.');
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      addToast('error', 'Mots de passe non identiques', 'La confirmation ne correspond pas au nouveau mot de passe.');
+      return;
+    }
+
+    setSecLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        addToast('error', 'Échec de mise à jour', error.message);
+      } else {
+        addToast('success', 'Mot de passe mis à jour !', 'Votre nouveau mot de passe de connexion a été enregistré.');
+        setNewPassword('');
+        setConfirmNewPassword('');
+      }
+    } catch (err: any) {
+      addToast('error', 'Erreur', err.message || 'Impossible de mettre à jour le mot de passe.');
+    } finally {
+      setSecLoading(false);
+    }
   };
 
   // Profile Save
@@ -599,7 +677,8 @@ export default function AdminPage() {
             { id: 'education', label: 'Formations', count: counts.education, Icon: GraduationCap },
             { id: 'skills', label: 'Compétences', count: counts.skills, Icon: Wrench },
             { id: 'certifications', label: 'Certifications', count: counts.certifications, Icon: Award },
-            { id: 'profile', label: 'Profil Administrateur', Icon: User },
+            { id: 'profile', label: 'Profil', Icon: User },
+            { id: 'security', label: 'Sécurité & Identifiants', Icon: KeyRound },
           ].map((tab) => {
             const active = activeTab === tab.id;
             const IconComponent = tab.Icon;
@@ -636,7 +715,7 @@ export default function AdminPage() {
       {/* Main Container */}
       <main className="mx-auto max-w-7xl px-4 sm:px-8 pt-8">
         {/* Search Bar for data lists */}
-        {activeTab !== 'overview' && activeTab !== 'profile' && (
+        {activeTab !== 'overview' && activeTab !== 'profile' && activeTab !== 'security' && (
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4 bg-[#0a0f1d] p-3.5 rounded-2xl border border-slate-800/80">
             <div className="relative flex-1 max-w-md">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -693,7 +772,7 @@ export default function AdminPage() {
             {/* Quick action shortcuts */}
             <div className="rounded-2xl border border-slate-800 bg-[#0a0f1d] p-6 space-y-4">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">Raccourcis d'administration</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <button
                   onClick={() => {
                     setActiveTab('projects');
@@ -704,7 +783,7 @@ export default function AdminPage() {
                   <FolderKanban className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
                   <div>
                     <h4 className="text-xs font-bold text-white group-hover:text-cyan-300">Ajouter un projet</h4>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Avec téléversement direct d'images</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Avec upload direct d'images</p>
                   </div>
                 </button>
                 <button
@@ -726,8 +805,18 @@ export default function AdminPage() {
                 >
                   <User className="w-5 h-5 text-slate-400 shrink-0 mt-0.5 group-hover:text-cyan-400" />
                   <div>
-                    <h4 className="text-xs font-bold text-white group-hover:text-cyan-300">Mettre à jour le profil</h4>
+                    <h4 className="text-xs font-bold text-white group-hover:text-cyan-300">Éditer le profil</h4>
                     <p className="text-[11px] text-slate-400 mt-0.5">Photo, bio et coordonnées</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('security')}
+                  className="p-4 rounded-xl border border-slate-800 bg-slate-800/40 text-left hover:bg-slate-800/80 transition group flex items-start gap-3"
+                >
+                  <KeyRound className="w-5 h-5 text-slate-400 shrink-0 mt-0.5 group-hover:text-cyan-400" />
+                  <div>
+                    <h4 className="text-xs font-bold text-white group-hover:text-cyan-300">Sécurité & Identifiants</h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Email et mot de passe de connexion</p>
                   </div>
                 </button>
               </div>
@@ -1133,6 +1222,116 @@ export default function AdminPage() {
                   />
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECURITY & CREDENTIALS TAB */}
+        {activeTab === 'security' && (
+          <div className="max-w-3xl mx-auto animate-fadeIn space-y-6">
+            {/* EMAIL UPDATE CARD */}
+            <div className="rounded-3xl border border-slate-800 bg-[#0a0f1d] p-6 sm:p-8 space-y-5 shadow-xl">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-800/80">
+                <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Adresse Email de Connexion</h3>
+                  <p className="text-xs text-slate-400">Modifiez l'adresse email d'accès au terminal d'administration</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleUpdateEmail} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1 font-mono">
+                    Email Actuel
+                  </label>
+                  <div className="px-3.5 py-2.5 rounded-xl border border-slate-800 bg-slate-900/90 text-xs font-mono text-cyan-400 font-semibold flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>{user?.email || 'Non défini'}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1 font-mono">
+                    Nouvelle Adresse Email *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={newLoginEmail}
+                    onChange={(e) => setNewLoginEmail(e.target.value)}
+                    placeholder="nouvelle-adresse@exemple.com"
+                    className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={secLoading}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold text-xs shadow-md hover:from-cyan-500 hover:to-blue-500 transition disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{secLoading ? 'Mise à jour...' : 'Mettre à jour l’email'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* PASSWORD UPDATE CARD */}
+            <div className="rounded-3xl border border-slate-800 bg-[#0a0f1d] p-6 sm:p-8 space-y-5 shadow-xl">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-800/80">
+                <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Mot de passe Administrateur</h3>
+                  <p className="text-xs text-slate-400">Définissez un nouveau mot de passe sécurisé (minimum 6 caractères)</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleUpdatePassword} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1 font-mono">
+                      Nouveau Mot de Passe *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1 font-mono">
+                      Confirmer le Mot de Passe *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={secLoading}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold text-xs shadow-md hover:from-cyan-500 hover:to-blue-500 transition disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>{secLoading ? 'Modification...' : 'Modifier le mot de passe'}</span>
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
