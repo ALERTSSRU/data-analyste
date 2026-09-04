@@ -455,25 +455,44 @@ export default function AdminPage() {
       data.screenshots = screenshotUrls.filter((u) => u && u.trim() !== '');
 
       const techDetailsStr = formData.get('tech_details') as string;
-      data.tech_details = techDetailsStr ? techDetailsStr.split(',').map((s) => s.trim()).filter(Boolean) : [];
+      const techList = techDetailsStr ? techDetailsStr.split(',').map((s) => s.trim()).filter(Boolean) : [];
+      
+      const categoryVal = formData.get('category') as string;
+      if (categoryVal && categoryVal.trim() && !techList.includes(categoryVal.trim())) {
+        techList.unshift(categoryVal.trim());
+      }
+      data.tech_details = techList;
 
-      const collaboratorsStr = formData.get('collaborators') as string;
-      data.collaborators = collaboratorsStr ? collaboratorsStr.split(',').map((s) => s.trim()).filter(Boolean) : [];
+      // Ensure description is populated from description or summary field
+      data.description = (formData.get('description') as string) || (formData.get('summary') as string) || data.title;
+
+      // CRITICAL: Remove fields that are not direct columns in Supabase 'projects' table
+      delete data.category;
+      delete data.summary;
+      delete data.collaborators;
     }
 
-    if (activeTab === 'experiences' || activeTab === 'education') {
+    if (activeTab === 'experiences') {
       data.is_current = formData.get('is_current') === 'on';
+    }
+
+    if (activeTab === 'education') {
+      data.is_current = formData.get('is_current') === 'on';
+      data.school_name = (formData.get('school_name') as string) || (formData.get('institution') as string) || '';
+      delete data.institution;
     }
 
     if (activeTab === 'certifications') {
       data.is_featured = formData.get('is_featured') === 'on';
-      if (!data.platform_name) data.platform_name = null;
-      if (!data.issue_date) data.issue_date = null;
-      if (!data.expiry_date) data.expiry_date = null;
+      data.issuer = (formData.get('issuer') as string) || (formData.get('issuing_organization') as string) || '';
+      delete data.platform_name;
+      delete data.issuing_organization;
+      delete data.issue_date;
+      delete data.expiry_date;
     }
 
     if (activeTab === 'skills') {
-      if (!data.category_id) data.category_id = null;
+      delete data.category_id;
     }
 
     try {
