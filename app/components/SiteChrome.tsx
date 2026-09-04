@@ -160,21 +160,21 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Navigation */}
-        <header className="fixed inset-x-0 top-0 z-40 px-3 sm:px-4">
+        <header className="fixed inset-x-0 top-0 z-40 px-2.5 sm:px-4 md:px-6">
           <nav
-            className="mx-auto mt-2.5 sm:mt-4 flex max-w-6xl items-center justify-between rounded-full border px-3.5 sm:px-5 py-2 sm:py-3 backdrop-blur-xl transition-all duration-300"
+            className="mx-auto mt-2.5 sm:mt-4 flex max-w-6xl items-center justify-between rounded-full border px-3 sm:px-5 py-2 sm:py-2.5 md:py-3 backdrop-blur-xl transition-all duration-300 shadow-md"
             style={{
               background: 'var(--nav-bg)',
               borderColor: 'var(--nav-border)',
             }}
           >
             {/* Brand */}
-            <Link href="/" className="text-sm font-semibold tracking-[0.18em] uppercase text-cyan-200">
+            <Link href="/" className="text-xs sm:text-sm font-semibold tracking-[0.16em] sm:tracking-[0.18em] uppercase text-cyan-200 shrink-0">
               Signal
             </Link>
 
             {/* Nav links (Home only) */}
-            <div className="flex items-center gap-6 text-sm" style={{ color: 'var(--foreground-muted)' }}>
+            <div className="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm" style={{ color: 'var(--foreground-muted)' }}>
               {links.map((link) => (
                 <Link
                   key={link.href}
@@ -188,10 +188,10 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Right controls */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {/* Phase label */}
               {isHydrated && (
-                <span className="hidden text-[10px] uppercase tracking-[0.22em] text-slate-400 sm:block">
+                <span className="hidden text-[10px] uppercase tracking-[0.22em] text-slate-400 md:block">
                   {phaseLabel}
                 </span>
               )}
@@ -199,7 +199,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
               {/* FR / EN toggle */}
               <button
                 onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
-                className="flex h-7 items-center rounded-full border px-2.5 text-[10px] font-bold uppercase tracking-widest transition-all duration-300 cursor-pointer"
+                className="flex h-7 items-center rounded-full border px-2 sm:px-2.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer"
                 style={{
                   borderColor: 'var(--panel-border)',
                   color: 'var(--foreground-muted)',
@@ -207,7 +207,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
                 title="Changer la langue"
               >
                 <span style={{ color: lang === 'fr' ? 'var(--accent)' : undefined }}>{lang === 'fr' ? 'FR' : 'EN'}</span>
-                <span className="mx-1 opacity-30">|</span>
+                <span className="mx-0.5 sm:mx-1 opacity-30">|</span>
                 <span style={{ color: lang === 'en' ? 'var(--accent)' : undefined }}>{lang === 'fr' ? 'EN' : 'FR'}</span>
               </button>
 

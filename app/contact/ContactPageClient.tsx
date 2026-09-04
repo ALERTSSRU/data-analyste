@@ -8,8 +8,8 @@ export function ContactPageClient({ profile }: { profile: PortfolioProfile }) {
   const { t } = useLanguage();
 
   return (
-    <main className="mx-auto max-w-5xl px-4 sm:px-6 pb-20 pt-24 sm:pt-32">
-      <div className="glass-panel rounded-[22px] sm:rounded-[28px] border border-cyan-400/25 p-6 sm:p-8 md:p-10 shadow-xl">
+    <main className="mx-auto max-w-5xl px-4 sm:px-8 md:px-10 pb-16 sm:pb-24 pt-24 sm:pt-32">
+      <div className="glass-panel rounded-[22px] sm:rounded-[28px] border border-cyan-400/25 p-5 sm:p-8 md:p-10 shadow-xl">
         <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">
           Contact
         </p>

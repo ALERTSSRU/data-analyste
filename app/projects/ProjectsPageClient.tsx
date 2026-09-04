@@ -8,8 +8,8 @@ export function ProjectsPageClient({ projects }: { projects: PortfolioProject[] 
   const { t } = useLanguage();
 
   return (
-    <main className="mx-auto max-w-7xl px-4 sm:px-6 pb-20 pt-24 sm:pt-32">
-      <div className="mb-8 sm:mb-10">
+    <main className="mx-auto max-w-7xl px-4 sm:px-8 md:px-10 pb-24 pt-28 sm:pt-36">
+      <div className="mb-8 sm:mb-12">
         <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">
           {t.sections.projects_label}
         </p>
@@ -18,34 +18,36 @@ export function ProjectsPageClient({ projects }: { projects: PortfolioProject[] 
         </h1>
       </div>
 
-      <div className="grid gap-5 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 sm:gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {projects.map((project) => (
           <Link
             key={project.slug}
             href={`/projects/${project.slug}`}
-            className="group glass-panel rounded-[24px] sm:rounded-[26px] border p-5 sm:p-6 transition hover:scale-[1.02] shadow-lg"
+            className="group glass-panel rounded-[24px] sm:rounded-[28px] border p-6 sm:p-7 transition hover:scale-[1.02] shadow-lg flex flex-col justify-between"
             style={{ borderColor: 'var(--panel-border)' }}
           >
-            {project.image_url ? (
-              <img
-                src={project.image_url}
-                alt={project.title}
-                className="mb-4 sm:mb-5 h-36 sm:h-44 w-full rounded-2xl object-cover border"
-                style={{ borderColor: 'var(--panel-border)' }}
-              />
-            ) : (
-              <div className="mb-4 sm:mb-5 h-36 sm:h-44 rounded-2xl bg-[radial-gradient(circle_at_30%_30%,rgba(34,211,238,0.18),transparent_55%),linear-gradient(135deg,#0f172a,#111827_55%)]" />
-            )}
-            <span className="text-[10px] uppercase tracking-[0.24em] text-cyan-300">
-              <Trans>{project.category}</Trans>
-            </span>
-            <h2 className="mt-2 sm:mt-3 text-xl sm:text-2xl font-semibold" style={{ color: 'var(--foreground)' }}>
-              <Trans>{project.title}</Trans>
-            </h2>
-            <p className="mt-2 sm:mt-3 text-sm leading-relaxed" style={{ color: 'var(--foreground-muted)' }}>
-              <Trans>{project.summary}</Trans>
-            </p>
-            <div className="mt-5 text-xs sm:text-sm font-semibold text-cyan-400">
+            <div>
+              {project.image_url ? (
+                <img
+                  src={project.image_url}
+                  alt={project.title}
+                  className="mb-5 h-44 sm:h-48 w-full rounded-2xl object-cover border"
+                  style={{ borderColor: 'var(--panel-border)' }}
+                />
+              ) : (
+                <div className="mb-5 h-44 sm:h-48 rounded-2xl bg-[radial-gradient(circle_at_30%_30%,rgba(34,211,238,0.18),transparent_55%),linear-gradient(135deg,#0f172a,#111827_55%)]" />
+              )}
+              <span className="text-[10px] uppercase tracking-[0.24em] text-cyan-300 font-semibold">
+                <Trans>{project.category}</Trans>
+              </span>
+              <h2 className="mt-2 sm:mt-3 text-xl sm:text-2xl font-semibold" style={{ color: 'var(--foreground)' }}>
+                <Trans>{project.title}</Trans>
+              </h2>
+              <p className="mt-2 sm:mt-3 text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--foreground-muted)' }}>
+                <Trans>{project.summary}</Trans>
+              </p>
+            </div>
+            <div className="mt-6 text-xs sm:text-sm font-semibold text-cyan-400">
               {t.project_card.open} →
             </div>
           </Link>
