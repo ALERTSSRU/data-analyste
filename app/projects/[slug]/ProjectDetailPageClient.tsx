@@ -8,20 +8,20 @@ export function ProjectDetailPageClient({ project }: { project: PortfolioProject
   const { t } = useLanguage();
 
   return (
-    <main className="mx-auto max-w-6xl px-6 pb-20 pt-32 text-slate-100">
-      <Link href="/projects" className="mb-8 inline-flex text-sm text-cyan-300">
-        {t.common.back_to_projects}
+    <main className="mx-auto max-w-6xl px-4 sm:px-6 pb-20 pt-24 sm:pt-32">
+      <Link href="/projects" className="mb-6 sm:mb-8 inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-cyan-400 hover:underline">
+        ← {t.common.back_to_projects}
       </Link>
 
-      <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-6 sm:gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <section>
           <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">
             <Trans>{project.category}</Trans>
           </p>
-          <h1 className="mt-4 text-4xl font-black tracking-tighter text-white md:text-5xl">
+          <h1 className="mt-3 sm:mt-4 text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter" style={{ color: 'var(--foreground)' }}>
             <Trans>{project.title}</Trans>
           </h1>
-          <p className="mt-6 max-w-xl text-lg leading-8 text-slate-300">
+          <p className="mt-4 sm:mt-6 max-w-xl text-base sm:text-lg leading-relaxed sm:leading-8" style={{ color: 'var(--foreground-muted)' }}>
             <Trans>{project.summary}</Trans>
           </p>
           
@@ -29,21 +29,22 @@ export function ProjectDetailPageClient({ project }: { project: PortfolioProject
             <img
               src={project.image_url}
               alt={project.title}
-              className="mt-8 h-70 w-full rounded-[28px] object-cover border border-white/10"
+              className="mt-6 sm:mt-8 h-48 sm:h-70 w-full rounded-[22px] sm:rounded-[28px] object-cover border shadow-lg"
+              style={{ borderColor: 'var(--panel-border)' }}
             />
           ) : (
-            <div className="mt-8 h-70 rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_30%_30%,rgba(34,211,238,0.2),transparent_30%),linear-gradient(135deg,#0f172a,#0b1221_70%)]" />
+            <div className="mt-6 sm:mt-8 h-48 sm:h-70 rounded-[22px] sm:rounded-[28px] border bg-[radial-gradient(circle_at_30%_30%,rgba(34,211,238,0.2),transparent_55%),linear-gradient(135deg,#0f172a,#0b1221_70%)]" style={{ borderColor: 'var(--panel-border)' }} />
           )}
         </section>
 
-        <aside className="glass-panel rounded-[28px] border border-white/10 p-6">
-          <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
+        <aside className="glass-panel rounded-[22px] sm:rounded-[28px] border p-5 sm:p-6 shadow-lg" style={{ borderColor: 'var(--panel-border)' }}>
+          <p className="text-xs uppercase tracking-[0.28em]" style={{ color: 'var(--foreground-faint)' }}>
             {t.common.indicators}
           </p>
-          <div className="mt-5 space-y-4">
+          <div className="mt-4 sm:mt-5 space-y-3 sm:space-y-4">
             {(project.metrics?.length ? project.metrics : project.stack ?? []).map((metric) => (
-              <div key={metric} className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                <p className="text-xl font-bold text-cyan-300">
+              <div key={metric} className="rounded-2xl border p-3.5 sm:p-4" style={{ borderColor: 'var(--panel-border)', background: 'var(--card-bg)' }}>
+                <p className="text-lg sm:text-xl font-bold text-cyan-400">
                   <Trans>{metric}</Trans>
                 </p>
               </div>
@@ -52,23 +53,23 @@ export function ProjectDetailPageClient({ project }: { project: PortfolioProject
         </aside>
       </div>
 
-      <section className="mt-12 grid gap-8 lg:grid-cols-[1fr_0.9fr]">
-        <article className="glass-panel rounded-[28px] border border-white/10 p-8">
-          <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
+      <section className="mt-8 sm:mt-12 grid gap-6 sm:gap-8 lg:grid-cols-[1fr_0.9fr]">
+        <article className="glass-panel rounded-[22px] sm:rounded-[28px] border p-6 sm:p-8 shadow-lg" style={{ borderColor: 'var(--panel-border)' }}>
+          <p className="text-xs uppercase tracking-[0.28em]" style={{ color: 'var(--foreground-faint)' }}>
             {t.common.context}
           </p>
-          <p className="mt-5 text-lg leading-8 text-slate-300">
+          <p className="mt-4 sm:mt-5 text-base sm:text-lg leading-relaxed sm:leading-8" style={{ color: 'var(--foreground-muted)' }}>
             <Trans>{project.story || project.description}</Trans>
           </p>
         </article>
 
-        <div className="glass-panel rounded-[28px] border border-white/10 p-8">
-          <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
+        <div className="glass-panel rounded-[22px] sm:rounded-[28px] border p-6 sm:p-8 shadow-lg" style={{ borderColor: 'var(--panel-border)' }}>
+          <p className="text-xs uppercase tracking-[0.28em]" style={{ color: 'var(--foreground-faint)' }}>
             {t.common.stack}
           </p>
-          <div className="mt-5 flex flex-wrap gap-3">
+          <div className="mt-4 sm:mt-5 flex flex-wrap gap-2 sm:gap-3">
             {(project.stack ?? []).map((item) => (
-              <span key={item} className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs uppercase tracking-[0.14em] text-slate-200">
+              <span key={item} className="rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.14em]" style={{ borderColor: 'var(--panel-border)', background: 'var(--card-bg)', color: 'var(--foreground)' }}>
                 <Trans>{item}</Trans>
               </span>
             ))}
@@ -77,18 +78,19 @@ export function ProjectDetailPageClient({ project }: { project: PortfolioProject
       </section>
 
       {project.screenshots && project.screenshots.length > 0 && (
-        <section className="mt-12 glass-panel rounded-[28px] border border-white/10 p-8">
-          <p className="text-xs uppercase tracking-[0.28em] text-slate-400">
+        <section className="mt-8 sm:mt-12 glass-panel rounded-[22px] sm:rounded-[28px] border p-6 sm:p-8 shadow-lg" style={{ borderColor: 'var(--panel-border)' }}>
+          <p className="text-xs uppercase tracking-[0.28em]" style={{ color: 'var(--foreground-faint)' }}>
             {t.common.screenshots}
           </p>
-          <div className="mt-6 grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+          <div className="mt-5 sm:mt-6 grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
             {project.screenshots.map((screenshot, idx) => (
               <a
                 key={idx}
                 href={screenshot}
                 target="_blank"
                 rel="noreferrer"
-                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900 aspect-video transition hover:border-cyan-400/40"
+                className="group relative overflow-hidden rounded-2xl border aspect-video transition hover:scale-[1.02]"
+                style={{ borderColor: 'var(--panel-border)', background: 'var(--card-bg)' }}
               >
                 <img
                   src={screenshot}

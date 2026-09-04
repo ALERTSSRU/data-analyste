@@ -7,35 +7,37 @@ export function CertificationsPageClient({ certifications }: { certifications: P
   const { t } = useLanguage();
 
   return (
-    <main className="mx-auto max-w-6xl px-6 pb-20 pt-32 text-slate-100">
-      <div className="mb-10">
+    <main className="mx-auto max-w-6xl px-4 sm:px-6 pb-20 pt-24 sm:pt-32">
+      <div className="mb-8 sm:mb-10">
         <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">
           {t.sections.certifications_label}
         </p>
-        <h1 className="mt-4 text-4xl font-black tracking-[-0.06em] text-white md:text-5xl">
+        <h1 className="mt-3 sm:mt-4 text-3xl sm:text-4xl md:text-5xl font-black tracking-[-0.06em]" style={{ color: 'var(--foreground)' }}>
           Proof of learning, applied to business problems.
         </h1>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-5 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {certifications.map((cert) => (
-          <article key={cert.title} className="glass-panel rounded-[26px] border border-white/10 p-6">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-linear-to-br from-cyan-500/20 to-violet-500/20 ring-1 ring-cyan-400/30">
-              <span className="text-lg">✓</span>
+          <article key={cert.title} className="glass-panel rounded-[24px] sm:rounded-[26px] border p-5 sm:p-6 shadow-lg" style={{ borderColor: 'var(--panel-border)' }}>
+            <div className="mb-4 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-linear-to-br from-cyan-500/20 to-violet-500/20 ring-1 ring-cyan-400/30">
+              <span className="text-base sm:text-lg text-cyan-400">✓</span>
             </div>
-            <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400">
+            <p className="text-[10px] uppercase tracking-[0.24em]" style={{ color: 'var(--foreground-faint)' }}>
               <Trans>{cert.issuer}</Trans>
             </p>
-            <h2 className="mt-4 text-2xl font-semibold text-white">
+            <h2 className="mt-2 sm:mt-3 text-xl sm:text-2xl font-semibold" style={{ color: 'var(--foreground)' }}>
               <Trans>{cert.title}</Trans>
             </h2>
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-300">
+            <div className="mt-3 flex items-center justify-between text-xs sm:text-sm font-medium" style={{ color: 'var(--foreground-muted)' }}>
               <span>{cert.date}</span>
               <span>{cert.duration}</span>
             </div>
-            <p className="mt-5 text-base leading-7 text-slate-300">
-              <Trans>{cert.description}</Trans>
-            </p>
+            {cert.description && (
+              <p className="mt-4 text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--foreground-muted)' }}>
+                <Trans>{cert.description}</Trans>
+              </p>
+            )}
           </article>
         ))}
       </div>

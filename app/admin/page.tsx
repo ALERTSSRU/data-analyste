@@ -425,9 +425,40 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#050816] text-slate-100 font-sans pt-28">
-      {/* Sidebar navigation */}
-      <aside className="w-64 border-r border-slate-800/80 bg-slate-950/45 px-4 py-6 hidden md:block">
+    <div className="flex flex-col md:flex-row min-h-screen font-sans pt-24 sm:pt-28" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+      {/* Mobile top tab bar */}
+      <div className="md:hidden border-b px-4 py-3 overflow-x-auto flex gap-2 shrink-0 scrollbar-none" style={{ borderColor: 'var(--panel-border)', background: 'var(--card-bg)' }}>
+        {[
+          { id: 'overview', label: 'Vue d\'ensemble' },
+          { id: 'projects', label: 'Projets' },
+          { id: 'experiences', label: 'Expériences' },
+          { id: 'education', label: 'Éducation' },
+          { id: 'certifications', label: 'Certifications' },
+          { id: 'skills', label: 'Compétences' },
+          { id: 'profile', label: 'Profil' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
+              activeTab === tab.id
+                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+        <button
+          onClick={handleLogout}
+          className="whitespace-nowrap rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-xs font-bold text-red-300 ml-auto"
+        >
+          Déconnexion
+        </button>
+      </div>
+
+      {/* Sidebar navigation for desktop */}
+      <aside className="w-64 border-r px-4 py-6 hidden md:block shrink-0" style={{ borderColor: 'var(--panel-border)', background: 'var(--card-bg)' }}>
         <div className="mb-8 px-2">
           <p className="text-[10px] uppercase tracking-widest text-cyan-300 font-mono font-bold">Base Connectée</p>
           <p className="text-xs text-slate-400 mt-1 truncate">{user.email}</p>
@@ -468,7 +499,7 @@ export default function AdminPage() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 px-6 py-8 overflow-y-auto max-w-6xl">
+      <main className="flex-1 px-4 sm:px-6 py-6 sm:py-8 overflow-y-auto max-w-6xl">
         {/* Tab content renderer */}
         {activeTab === 'overview' && (
           <div>

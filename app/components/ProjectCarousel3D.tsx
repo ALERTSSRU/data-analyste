@@ -27,8 +27,26 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
   const baseAngleRef    = useRef(0);
   const movedRef        = useRef(false); // whether pointer moved enough to block click
 
+  const [screenWidth, setScreenWidth] = useState(1024);
+
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = screenWidth < 640;
+  const isTablet = screenWidth >= 640 && screenWidth < 1024;
+
+  const cardWidth   = isMobile ? 220 : isTablet ? 250 : 270;
+  const stageHeight = isMobile ? 330 : 390;
   const anglePerCard = count > 0 ? 360 / count : 0;
-  const radius       = Math.max(280, count * 72);
+  const radius       = isMobile
+    ? Math.max(180, count * 50)
+    : isTablet
+    ? Math.max(230, count * 60)
+    : Math.max(280, count * 72);
 
   // ── Smooth damping ──
   useEffect(() => {
@@ -165,8 +183,8 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
         ref={stageRef}
         className="relative mx-auto overflow-visible"
         style={{
-          height: 390,
-          perspective: '1200px',
+          height: stageHeight,
+          perspective: isMobile ? '800px' : '1200px',
           perspectiveOrigin: '50% 45%',
           touchAction: 'pan-y',
           cursor: 'grab',
@@ -191,10 +209,10 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
                 key={project.slug}
                 className="absolute"
                 style={{
-                  width: 270,
+                  width: cardWidth,
                   left: '50%',
                   top: '50%',
-                  marginLeft: -135,
+                  marginLeft: -cardWidth / 2,
                   marginTop:  -165,
                   transformStyle: 'preserve-3d',
                   transform: `rotateY(${cardAngle}deg) translateZ(${radius}px)`,
