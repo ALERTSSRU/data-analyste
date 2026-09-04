@@ -415,3 +415,13 @@ export async function getSkills(): Promise<PortfolioSkill[]> {
 export function isBankExperience(experience: PortfolioExperience) {
   return /banque|bank|crédit|credit|finance/i.test(`${experience.company} ${experience.position}`);
 }
+
+export function ensureExternalUrl(url?: string | null): string {
+  if (!url) return '#';
+  const trimmed = url.trim();
+  if (!trimmed) return '#';
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import type { PortfolioProfile } from '@/lib/portfolio';
+import { ensureExternalUrl } from '@/lib/portfolio';
 import { useLanguage, Trans } from '@/lib/LanguageContext';
 
 export function ContactPageClient({ profile }: { profile: PortfolioProfile }) {
@@ -31,7 +32,7 @@ export function ContactPageClient({ profile }: { profile: PortfolioProfile }) {
             {profile.email ?? 'hello@example.com'}
           </a>
           <a
-            href={profile.linkedin_url ?? 'https://www.linkedin.com'}
+            href={ensureExternalUrl(profile.linkedin_url ?? 'https://www.linkedin.com')}
             target="_blank"
             rel="noreferrer"
             className="rounded-full border px-5 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition hover:scale-105"
@@ -44,7 +45,7 @@ export function ContactPageClient({ profile }: { profile: PortfolioProfile }) {
             LinkedIn
           </a>
           <a
-            href={profile.github_url ?? 'https://github.com'}
+            href={ensureExternalUrl(profile.github_url ?? 'https://github.com')}
             target="_blank"
             rel="noreferrer"
             className="rounded-full border px-5 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition hover:scale-105"

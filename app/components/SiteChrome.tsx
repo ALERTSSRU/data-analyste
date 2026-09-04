@@ -3,7 +3,7 @@
 import { DataField } from '@/app/components/canvas/DataField';
 import { LenisScroll } from '@/app/components/LenisScroll';
 import { LanguageProvider, useLanguage } from '@/lib/LanguageContext';
-import { getProfile } from '@/lib/portfolio';
+import { getProfile, ensureExternalUrl } from '@/lib/portfolio';
 import { phaseFromProgress, sceneState, tintFromProgress } from '@/lib/scene-state';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -279,7 +279,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
               {/* LinkedIn */}
               {profile.linkedin_url && (
                 <a
-                  href={profile.linkedin_url}
+                  href={ensureExternalUrl(profile.linkedin_url)}
                   target="_blank"
                   rel="noreferrer"
                   title="LinkedIn"
@@ -292,7 +292,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
               {/* GitHub */}
               {profile.github_url && (
                 <a
-                  href={profile.github_url}
+                  href={ensureExternalUrl(profile.github_url)}
                   target="_blank"
                   rel="noreferrer"
                   title="GitHub"
@@ -305,7 +305,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
               {/* Website contact */}
               {profile.website_url && (
                 <a
-                  href={profile.website_url}
+                  href={ensureExternalUrl(profile.website_url)}
                   target="_blank"
                   rel="noreferrer"
                   title="Contact Web"
