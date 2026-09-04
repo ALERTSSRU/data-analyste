@@ -73,6 +73,7 @@ function ChatIcon() {
 // ── Inner chrome (has access to language context) ──
 function ChromeInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isAdmin = pathname?.startsWith('/admin');
   const { lang, setLang, t } = useLanguage();
   const [phase, setPhase] = useState(sceneState.phase);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -80,6 +81,11 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const isHome = pathname === '/';
+
+  // Completely bypass public header and overlays on Admin panel
+  if (isAdmin) {
+    return <div className="min-h-screen bg-[#060913] text-slate-100">{children}</div>;
+  }
 
   // Only show Home link in the header nav per user request
   const links = [
