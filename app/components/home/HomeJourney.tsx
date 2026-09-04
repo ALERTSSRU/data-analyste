@@ -1,5 +1,6 @@
 'use client';
 
+import { DataAnalyticsMetrics } from '@/app/components/home/DataAnalyticsMetrics';
 import { ProjectCarousel3D } from '@/app/components/ProjectCarousel3D';
 import { ScrollReveal } from '@/app/components/ScrollReveal';
 import { Trans, useLanguage } from '@/lib/LanguageContext';
@@ -103,6 +104,9 @@ export function HomeJourney({
           </div>
         </div>
       </section>
+
+      {/* Data Analytics & Statistical Metrics Section */}
+      <DataAnalyticsMetrics />
 
       <section data-scene="school" className="relative mx-auto max-w-6xl px-4 sm:px-8 md:px-10 py-16 sm:py-24 md:py-32">
         <ScrollReveal>

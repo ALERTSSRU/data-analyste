@@ -499,11 +499,20 @@ function DataMorph() {
       v.bLit = 1 - f; v.bScale = THREE.MathUtils.lerp(1, 0.001, f);
       v.qLit = f;     v.qScale = THREE.MathUtils.lerp(0.001, 1, f);
     } else {
-      // ── FINALE: all three visible, aligned ──
-      const f = smoothEase(0.76, 0.92, p);
-      v.sLit = 0.55 + f * 0.45; v.sScale = 0.65 + f * 0.35;
-      v.bLit = 0.50 + f * 0.50; v.bScale = 0.60 + f * 0.40;
-      v.qLit = 0.55 + f * 0.45; v.qScale = 0.65 + f * 0.35;
+      // ── FINALE: all three models fade in and scale up with zero abrupt jumps ──
+      const f = smoothEase(0.74, 0.92, p);
+      
+      // Smooth cubic scaling & opacity for School (left)
+      v.sLit   = THREE.MathUtils.damp(v.sLit, f, 5, delta);
+      v.sScale = THREE.MathUtils.damp(v.sScale, THREE.MathUtils.lerp(0.001, 1.0, f), 5, delta);
+
+      // Smooth cubic scaling & opacity for Bank (center)
+      v.bLit   = THREE.MathUtils.damp(v.bLit, f, 5, delta);
+      v.bScale = THREE.MathUtils.damp(v.bScale, THREE.MathUtils.lerp(0.001, 1.0, f), 5, delta);
+
+      // Signal (right) maintains full presence and settles to scale 1.0
+      v.qLit   = THREE.MathUtils.damp(v.qLit, 1.0, 5, delta);
+      v.qScale = THREE.MathUtils.damp(v.qScale, 1.0, 5, delta);
     }
 
     // ── Apply visibility ──
@@ -514,23 +523,24 @@ function DataMorph() {
     // ── Group X offset ──
     const isMobile = state.size.width < 768;
     let targetX = 0;
-    if (!isMobile && p >= 0.18 && p < 0.76) {
+    if (!isMobile && p >= 0.18 && p < 0.74) {
       const enter = smoothEase(0.18, 0.27, p);
-      const leave = smoothEase(0.70, 0.76, p);
+      const leave = smoothEase(0.68, 0.74, p);
       targetX = 2.0 * enter * (1 - leave);
     }
     if (outerGroup.current) {
       outerGroup.current.position.x = THREE.MathUtils.damp(outerGroup.current.position.x, targetX, 3, delta);
     }
 
-    // ── Finale positions ──
-    const alignX = p >= 0.76 ? smoothEase(0.76, 0.93, p) : 0;
+    // ── Finale positions with smooth damping ──
+    const alignX = p >= 0.74 ? smoothEase(0.74, 0.92, p) : 0;
 
     // ── School model animation ──
     if (schoolGroup.current) {
       schoolGroup.current.rotation.y += delta * 0.20;
       schoolGroup.current.rotation.x = Math.sin(t * 0.17) * 0.09;
-      schoolGroup.current.position.x = THREE.MathUtils.lerp(0, -3.4, alignX);
+      const targetSchoolX = THREE.MathUtils.lerp(0, -3.4, alignX);
+      schoolGroup.current.position.x = THREE.MathUtils.damp(schoolGroup.current.position.x, targetSchoolX, 4, delta);
       schoolGroup.current.position.y = 0.1 + Math.sin(t * 0.32) * 0.055;
     }
     if (sRing1.current) sRing1.current.rotation.z += delta * 0.52;
@@ -546,7 +556,8 @@ function DataMorph() {
     if (bankGroup.current) {
       bankGroup.current.rotation.y += delta * 0.14;
       bankGroup.current.rotation.z  = Math.sin(t * 0.19) * 0.07;
-      bankGroup.current.position.x = THREE.MathUtils.lerp(0, 0, alignX);
+      const targetBankX = THREE.MathUtils.lerp(0, 0, alignX);
+      bankGroup.current.position.x = THREE.MathUtils.damp(bankGroup.current.position.x, targetBankX, 4, delta);
       bankGroup.current.position.y  = Math.sin(t * 0.38 + 1) * 0.045;
     }
     if (bKnot1.current) {
@@ -569,7 +580,8 @@ function DataMorph() {
     if (signalGroup.current) {
       signalGroup.current.rotation.y += delta * 0.19;
       signalGroup.current.rotation.x += delta * 0.11;
-      signalGroup.current.position.x = THREE.MathUtils.lerp(0, 3.4, alignX);
+      const targetSignalX = THREE.MathUtils.lerp(0, 3.4, alignX);
+      signalGroup.current.position.x = THREE.MathUtils.damp(signalGroup.current.position.x, targetSignalX, 4, delta);
       signalGroup.current.position.y = -0.1 + Math.sin(t * 0.42 + 2) * 0.055;
     }
     if (qOct1.current) {
