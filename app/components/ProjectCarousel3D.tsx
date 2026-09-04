@@ -89,32 +89,31 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPaused]);
 
-  // ── Native-friendly pointer handlers ──
-  // Strategy: attach raw listeners to the stage element so we can call
-  // preventDefault ONLY after confirming a horizontal drag — browsers
-  // require this to happen in a non-passive listener attached via addEventListener.
+  // ── Native-friendly pointer & touch handlers ──
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
 
     const onDown = (e: PointerEvent) => {
-      if (e.button !== 0) return; // left button only
-      startXRef.current    = e.clientX;
-      startYRef.current    = e.clientY;
-      baseAngleRef.current = targetAngle; // captured via closure — see note*
+      // Mouse requires primary button (0). Touch/pen allow button 0 or -1.
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      startXRef.current     = e.clientX;
+      startYRef.current     = e.clientY;
+      baseAngleRef.current  = targetAngleRef.current;
       dragActiveRef.current = false;
-      movedRef.current      = false;
+      movedRef.current       = false;
     };
 
     const onMove = (e: PointerEvent) => {
-      if (e.buttons !== 1) return; // only while left button held
+      if (e.pointerType === 'mouse' && e.buttons !== 1) return;
       const dx = e.clientX - startXRef.current;
       const dy = e.clientY - startYRef.current;
 
       if (!dragActiveRef.current) {
         const dist = Math.hypot(dx, dy);
-        if (dist < 8) return;
-        // Vertical dominant → let page scroll, don't drag carousel
+        const threshold = e.pointerType === 'touch' ? 5 : 8;
+        if (dist < threshold) return;
+        // Vertical dominant → let page scroll natively
         if (Math.abs(dy) > Math.abs(dx)) return;
         // Confirmed horizontal drag
         dragActiveRef.current = true;
@@ -124,34 +123,84 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
       }
 
       if (dragActiveRef.current) {
-        // Only prevent scroll after confirmed horizontal drag
         e.preventDefault();
-        setTargetAngle(baseAngleRef.current + dx * 0.20);
+        const speed = e.pointerType === 'touch' ? 0.32 : 0.20;
+        setTargetAngle(baseAngleRef.current + dx * speed);
       }
     };
 
     const onUp = () => {
       if (dragActiveRef.current) {
-        // Snap to nearest slot
         setTargetAngle((prev) => Math.round(prev / anglePerCard) * anglePerCard);
         scheduleResume();
       }
       dragActiveRef.current = false;
-      // movedRef stays true briefly so click handlers can check it
       setTimeout(() => { movedRef.current = false; }, 50);
     };
 
-    // { passive: false } is required so we can call e.preventDefault() on horizontal drag
+    // Native Touch Event Fallbacks for maximum mobile browser compatibility
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      startXRef.current     = touch.clientX;
+      startYRef.current     = touch.clientY;
+      baseAngleRef.current  = targetAngleRef.current;
+      dragActiveRef.current = false;
+      movedRef.current       = false;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      const dx = touch.clientX - startXRef.current;
+      const dy = touch.clientY - startYRef.current;
+
+      if (!dragActiveRef.current) {
+        const dist = Math.hypot(dx, dy);
+        if (dist < 5) return;
+        if (Math.abs(dy) > Math.abs(dx)) return; // let page scroll
+        dragActiveRef.current = true;
+        movedRef.current      = true;
+        stopAuto();
+        if (resumeRef.current) clearTimeout(resumeRef.current);
+      }
+
+      if (dragActiveRef.current) {
+        if (e.cancelable) e.preventDefault();
+        setTargetAngle(baseAngleRef.current + dx * 0.34);
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (dragActiveRef.current) {
+        setTargetAngle((prev) => Math.round(prev / anglePerCard) * anglePerCard);
+        scheduleResume();
+      }
+      dragActiveRef.current = false;
+      setTimeout(() => { movedRef.current = false; }, 50);
+    };
+
+    // Attach listeners with { passive: false } for preventDefault support
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointermove', onMove, { passive: false });
     el.addEventListener('pointerup',   onUp);
     el.addEventListener('pointerleave', onUp);
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false });
+    el.addEventListener('touchend',   onTouchEnd);
+    el.addEventListener('touchcancel', onTouchEnd);
 
     return () => {
       el.removeEventListener('pointerdown', onDown);
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup',   onUp);
       el.removeEventListener('pointerleave', onUp);
+
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove',  onTouchMove);
+      el.removeEventListener('touchend',   onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchEnd);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anglePerCard]); // *targetAngle is read via a separate ref below
