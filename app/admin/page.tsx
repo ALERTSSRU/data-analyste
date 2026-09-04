@@ -21,6 +21,7 @@ import {
   Wrench,
   Edit3,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ConfirmModal } from '../components/admin/ConfirmModal';
 import { ImageUploadPicker } from '../components/admin/ImageUploadPicker';
@@ -32,6 +33,7 @@ type UserSession = {
 };
 
 export default function AdminPage() {
+  const router = useRouter();
   const [user, setUser] = useState<UserSession | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -277,6 +279,13 @@ export default function AdminPage() {
     addToast('info', 'Déconnexion', 'Vous avez été déconnecté de l’espace administrateur.');
   };
 
+  const triggerRevalidation = async () => {
+    try {
+      await fetch('/api/revalidate', { method: 'POST' });
+    } catch {}
+    router.refresh();
+  };
+
   // Profile Save
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -299,6 +308,7 @@ export default function AdminPage() {
       } else {
         addToast('success', 'Profil mis à jour', 'Vos informations ont été enregistrées.');
         fetchData();
+        triggerRevalidation();
       }
     } catch (err: any) {
       setFormError(err.message || 'Erreur lors de la sauvegarde du profil');
@@ -335,6 +345,7 @@ export default function AdminPage() {
           } else {
             addToast('success', 'Élément supprimé', 'La suppression a été effectuée.');
             fetchData();
+            triggerRevalidation();
           }
         } catch (err: any) {
           addToast('error', 'Erreur', err.message);
@@ -412,6 +423,7 @@ export default function AdminPage() {
           `L’élément a été sauvegardé avec succès.`
         );
         fetchData();
+        triggerRevalidation();
       }
     } catch (err: any) {
       setFormError(err.message || 'Une erreur est survenue lors de l’enregistrement.');
