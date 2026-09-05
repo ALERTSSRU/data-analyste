@@ -376,11 +376,13 @@ function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
   const sRing2  = useRef<THREE.Mesh>(null);
   const sRing3  = useRef<THREE.Mesh>(null);
   const sCore   = useRef<THREE.Mesh>(null);
+  const sOrbit  = useRef<THREE.Mesh>(null);
 
   // ── Bank (torus knot) refs ──
   const bKnot1  = useRef<THREE.Mesh>(null);
   const bKnot2  = useRef<THREE.Mesh>(null);
   const bHalo   = useRef<THREE.Mesh>(null);
+  const bCore   = useRef<THREE.Mesh>(null);
 
   // ── Signal (octahedron) refs ──
   const qOct1   = useRef<THREE.Mesh>(null);
@@ -388,6 +390,7 @@ function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
   const qCore   = useRef<THREE.Mesh>(null);
   const qRing1  = useRef<THREE.Mesh>(null);
   const qRing2  = useRef<THREE.Mesh>(null);
+  const qPulsar = useRef<THREE.Mesh>(null);
 
   // Finale connection line
   const lineRef  = useRef<any>(null);
@@ -520,19 +523,19 @@ function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
       v.qLit = f;     v.qScale = THREE.MathUtils.lerp(0.001, 1, f);
     } else {
       // ── FINALE: all three models fade in and scale up with zero abrupt jumps ──
-      const f = smoothEase(0.74, 0.92, p);
+      const f = smoothEase(0.72, 0.94, p); // Widened easing window for smoother entry
       
       // Smooth cubic scaling & opacity for School (left)
-      v.sLit   = THREE.MathUtils.damp(v.sLit, f, 5, delta);
-      v.sScale = THREE.MathUtils.damp(v.sScale, THREE.MathUtils.lerp(0.001, 1.0, f), 5, delta);
+      v.sLit   = THREE.MathUtils.damp(v.sLit, f, 3, delta);
+      v.sScale = THREE.MathUtils.damp(v.sScale, THREE.MathUtils.lerp(0.001, 1.0, f), 3, delta);
 
       // Smooth cubic scaling & opacity for Bank (center)
-      v.bLit   = THREE.MathUtils.damp(v.bLit, f, 5, delta);
-      v.bScale = THREE.MathUtils.damp(v.bScale, THREE.MathUtils.lerp(0.001, 1.0, f), 5, delta);
+      v.bLit   = THREE.MathUtils.damp(v.bLit, f, 3, delta);
+      v.bScale = THREE.MathUtils.damp(v.bScale, THREE.MathUtils.lerp(0.001, 1.0, f), 3, delta);
 
       // Signal (right) maintains full presence and settles to scale 1.0
-      v.qLit   = THREE.MathUtils.damp(v.qLit, 1.0, 5, delta);
-      v.qScale = THREE.MathUtils.damp(v.qScale, 1.0, 5, delta);
+      v.qLit   = THREE.MathUtils.damp(v.qLit, 1.0, 3, delta);
+      v.qScale = THREE.MathUtils.damp(v.qScale, 1.0, 3, delta);
     }
 
     // ── Apply visibility ──
@@ -553,7 +556,7 @@ function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
     }
 
     // ── Finale positions with smooth damping ──
-    const alignX = p >= 0.74 ? smoothEase(0.74, 0.92, p) : 0;
+    const alignX = p >= 0.72 ? smoothEase(0.72, 0.94, p) : 0;
 
     // ── School model animation ──
     if (schoolGroup.current) {
@@ -570,6 +573,16 @@ function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
       const s = 0.24 + Math.sin(t * 2.7) * 0.08;
       sCore.current.scale.setScalar(s);
       (sCore.current.material as THREE.MeshBasicMaterial).opacity = (0.4 + Math.sin(t * 2.7) * 0.25) * v.sLit;
+    }
+    if (sOrbit.current) {
+      sOrbit.current.position.set(
+        Math.cos(t * 1.5) * 2.2,
+        Math.sin(t * 2.1) * 0.5,
+        Math.sin(t * 1.5) * 2.2
+      );
+      sOrbit.current.rotation.x += delta * 2;
+      sOrbit.current.rotation.y += delta * 2;
+      (sOrbit.current.material as THREE.MeshBasicMaterial).opacity = 0.8 * v.sLit;
     }
 
     // ── Bank model animation ──
@@ -594,6 +607,11 @@ function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
     if (bHalo.current) {
       bHalo.current.rotation.z += delta * 0.07;
       (bHalo.current.material as THREE.MeshBasicMaterial).opacity = (0.14 + Math.sin(t * 0.7) * 0.06) * v.bLit;
+    }
+    if (bCore.current) {
+      const s = 0.35 + Math.sin(t * 4.0) * 0.05;
+      bCore.current.scale.setScalar(s);
+      (bCore.current.material as THREE.MeshBasicMaterial).opacity = (0.5 + Math.sin(t * 4.0) * 0.3) * v.bLit;
     }
 
     // ── Signal model animation ──
@@ -628,6 +646,11 @@ function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
       const c2 = (t * 0.65 + 0.5) % 1.0;
       qRing2.current.scale.setScalar(0.8 + c2 * 1.1);
       (qRing2.current.material as THREE.MeshBasicMaterial).opacity = (1 - c2) * 0.32 * v.qLit;
+    }
+    if (qPulsar.current) {
+      qPulsar.current.rotation.y -= delta * 0.5;
+      qPulsar.current.scale.y = 1.0 + Math.sin(t * 5.0) * 0.2;
+      (qPulsar.current.material as THREE.MeshBasicMaterial).opacity = (0.3 + Math.sin(t * 5.0) * 0.2) * v.qLit;
     }
 
     // ── Finale connection line ──
@@ -687,6 +710,10 @@ function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
           <sphereGeometry args={[0.22, 16, 16]} />
           <meshBasicMaterial color="#e0f2fe" transparent opacity={0.85} />
         </mesh>
+        <mesh ref={sOrbit}>
+          <octahedronGeometry args={[0.15, 0]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.9} />
+        </mesh>
       </group>
 
       {/* ── MODEL 2: Data Pipeline Torus Knot ── */}
@@ -704,6 +731,10 @@ function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
         <mesh ref={bHalo} rotation={[Math.PI / 2, 0, 0]} userData={{ opBase: 0.14 }}>
           <torusGeometry args={[2.05, 0.022, 6, 110]} />
           <meshBasicMaterial color="#6ee7b7" transparent opacity={0.14} />
+        </mesh>
+        <mesh ref={bCore}>
+          <icosahedronGeometry args={[0.3, 1]} />
+          <meshBasicMaterial color="#a7f3d0" transparent opacity={0.7} wireframe />
         </mesh>
       </group>
 
@@ -730,6 +761,10 @@ function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
         <mesh ref={qCore}>
           <icosahedronGeometry args={[0.22, 0]} />
           <meshBasicMaterial color="#f0e6ff" transparent opacity={0.55} />
+        </mesh>
+        <mesh ref={qPulsar}>
+          <cylinderGeometry args={[0.05, 0.05, 4, 8]} />
+          <meshBasicMaterial color="#ddd6fe" transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
       </group>
 
