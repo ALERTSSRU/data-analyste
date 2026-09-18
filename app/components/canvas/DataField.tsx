@@ -3,7 +3,7 @@
 import { phaseFromProgress, sceneState } from '@/lib/scene-state';
 import { Line, PointMaterial, Points, Preload } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Bloom, EffectComposer } from '@react-three/postprocessing';
+import { Bloom, EffectComposer, Vignette, Noise, DepthOfField } from '@react-three/postprocessing';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
@@ -800,7 +800,22 @@ export function DataField() {
         <pointLight position={[0, 6, 2]}  intensity={14} color="#c4b5fd" />
         <DataMorph />
         <EffectComposer>
-          <Bloom luminanceThreshold={0.10} intensity={1.4} mipmapBlur radius={0.65} />
+          <Bloom luminanceThreshold={0.10} intensity={bloomIntensity} mipmapBlur radius={0.65} />
+          {tier === 'high' && (
+            <>
+              <Vignette eskil={false} offset={0.15} darkness={0.35} />
+              <Noise opacity={0.035} premultiply />
+              <DepthOfField 
+                focusDistance={0.0}
+                focalLength={0.02}
+                bokehScale={2.5}
+                height={480}
+              />
+            </>
+          )}
+          {tier === 'medium' && (
+            <Vignette eskil={false} offset={0.2} darkness={0.25} />
+          )}
         </EffectComposer>
         <Preload all />
       </Canvas>

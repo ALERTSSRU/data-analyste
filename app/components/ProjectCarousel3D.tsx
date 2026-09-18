@@ -2,7 +2,8 @@
 
 import type { PortfolioProject } from '@/lib/portfolio';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import gsap from 'gsap';
 
 interface ProjectCarousel3DProps {
   projects: PortfolioProject[];
@@ -252,6 +253,10 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
             const isActive  = i === activeIndex;
             const scale      = isActive ? 1.0 : 0.84;
             const brightness = isActive ? 1   : 0.52;
+            
+            // Enhanced 3D effects for active card
+            const zOffset = isActive ? 40 : 0;
+            const shadowIntensity = isActive ? 0.35 : 0.15;
 
             return (
               <div
@@ -264,7 +269,8 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
                   marginLeft: -cardWidth / 2,
                   marginTop:  -165,
                   transformStyle: 'preserve-3d',
-                  transform: `rotateY(${cardAngle}deg) translateZ(${radius}px)`,
+                  transform: `rotateY(${cardAngle}deg) translateZ(${radius + zOffset}px)`,
+                  transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                 }}
                 onMouseEnter={() => setIsPaused(true)}
                 onMouseLeave={() => { setIsPaused(false); if (resumeRef.current) clearTimeout(resumeRef.current); }}
@@ -288,11 +294,11 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
                     className="rounded-[20px] border overflow-hidden shadow-xl"
                     style={{
                       background: 'var(--card-bg)',
-                      borderColor: isActive ? 'rgba(34,211,238,0.28)' : 'var(--panel-border)',
+                      borderColor: isActive ? 'rgba(34,211,238,0.35)' : 'var(--panel-border)',
                       boxShadow: isActive
-                        ? '0 0 32px rgba(34,211,238,0.14), 0 24px 48px rgba(0,0,0,0.55)'
-                        : '0 6px 24px rgba(0,0,0,0.35)',
-                      transition: 'box-shadow 0.35s ease, border-color 0.35s ease',
+                        ? '0 0 40px rgba(34,211,238,0.20), 0 30px 60px rgba(0,0,0,0.60), inset 0 0 20px rgba(34,211,238,0.05)'
+                        : '0 8px 32px rgba(0,0,0,0.40)',
+                      transition: 'box-shadow 0.4s ease, border-color 0.4s ease',
                     }}
                   >
                     {/* Image */}
@@ -304,8 +310,9 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
                           draggable={false}
                           className="h-full w-full object-cover"
                           style={{
-                            transform: isActive ? 'scale(1.06)' : 'scale(1)',
-                            transition: 'transform 0.5s ease',
+                            transform: isActive ? 'scale(1.08)' : 'scale(1)',
+                            transition: 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                            filter: isActive ? 'contrast(1.05) saturate(1.05)' : 'none',
                           }}
                         />
                       ) : (
@@ -314,6 +321,16 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
                           style={{
                             background:
                               'radial-gradient(circle at 30% 30%, rgba(34,211,238,0.18) 0%, transparent 55%), linear-gradient(135deg, #0f172a 0%, #0b1221 100%)',
+                          }}
+                        />
+                      )}
+                      {/* Reflection overlay on active card */}
+                      {isActive && (
+                        <div
+                          className="absolute inset-0 pointer-events-none"
+                          style={{
+                            background: 'linear-gradient(180deg, rgba(34,211,238,0.08) 0%, transparent 40%, transparent 60%, rgba(34,211,238,0.05) 100%)',
+                            mixBlendMode: 'overlay',
                           }}
                         />
                       )}
