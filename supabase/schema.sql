@@ -197,7 +197,24 @@ create table if not exists public.training_platforms (
 alter table public.training_platforms enable row level security;
 
 -- =========================================================
--- 8. INDEXES
+-- 8. METRICS - KPIs for Data Analytics Dashboard
+-- =========================================================
+create table if not exists public.metrics (
+  id uuid primary key default uuid_generate_v4(),
+  label text not null,
+  value text not null,
+  change text,
+  description text,
+  icon_type text default 'database',
+  sort_order integer default 0,
+  is_featured boolean not null default true,
+  created_at timestamptz not null default timezone('utc'::text, now())
+);
+
+alter table public.metrics enable row level security;
+
+-- =========================================================
+-- 9. INDEXES
 -- =========================================================
 create index if not exists idx_projects_slug on public.projects(slug);
 create index if not exists idx_experiences_slug on public.experiences(slug);
@@ -206,9 +223,11 @@ create index if not exists idx_project_skills_skill on public.project_skills(ski
 create index if not exists idx_project_tech_project on public.project_tech(project_id);
 create index if not exists idx_certifications_featured on public.certifications(is_featured);
 create index if not exists idx_certifications_issue_date on public.certifications(issue_date);
+create index if not exists idx_metrics_featured on public.metrics(is_featured);
+create index if not exists idx_metrics_sort on public.metrics(sort_order);
 
 -- =========================================================
--- 9. SAMPLE SECURITY EXAMPLE
+-- 10. SAMPLE SECURITY EXAMPLE
 -- For admin access, the service role or authenticated users can be
 -- granted access through policies in Supabase.
 -- =========================================================
@@ -220,6 +239,12 @@ create index if not exists idx_certifications_issue_date on public.certification
 --
 -- create policy "Allow authenticated users to manage projects"
 -- on public.projects for all
+-- using (auth.role() = 'authenticated')
+-- with check (auth.role() = 'authenticated');
+
+-- Policy for metrics table
+-- create policy "Allow authenticated users to manage metrics"
+-- on public.metrics for all
 -- using (auth.role() = 'authenticated')
 -- with check (auth.role() = 'authenticated');
 
