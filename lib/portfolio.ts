@@ -1,10 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
+import { supabaseAnonKey, supabaseUrl } from './supabase/config';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-export const supabase =
-  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+/**
+ * Public, read-only client used by Server Components.
+ *
+ * It is intentionally session-less (no cookies), because the public portfolio
+ * only reads data that Row Level Security exposes to `anon`. Anything that
+ * needs an authenticated session (admin writes, uploads, realtime) uses
+ * `getSupabaseBrowserClient()` from `lib/supabase/browser.ts` instead, so the
+ * session lives in cookies and is visible to `proxy.ts` and route handlers.
+ */
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 export type PortfolioProject = {
   id?: string;
@@ -166,12 +172,12 @@ const fallbackCertifications: PortfolioCertification[] = [
 ];
 
 const fallbackSkills: PortfolioSkill[] = [
-  { name: 'SQL' },
-  { name: 'Python' },
-  { name: 'Power BI' },
-  { name: 'ETL' },
-  { name: 'Next.js' },
-  { name: 'Supabase' },
+  { name: 'SQL', category: 'Bases de données' },
+  { name: 'Python', category: 'Langages' },
+  { name: 'Power BI', category: 'BI & Dashboarding' },
+  { name: 'ETL', category: 'Data Engineering' },
+  { name: 'Next.js', category: 'Full Stack' },
+  { name: 'Supabase', category: 'Full Stack' },
 ];
 
 function asTextList(value: unknown): string[] {
@@ -222,14 +228,14 @@ function mapProject(item: Record<string, any>): PortfolioProject {
     .map((row: any) => row?.skills?.name)
     .filter(Boolean) as string[];
   const nestedTech = (item.project_tech ?? [])
-    .map((row: any) => row?.tech_catalog?.name || row?.category_label)
+    .map((row: any) => row?.tech_catalog?.name)
     .filter(Boolean) as string[];
   const details = asTextList(item.tech_details);
   const stack = [...new Set([...nestedSkills, ...nestedTech, ...details])];
   const category =
+    item.category ||
     item.project_tech?.[0]?.category_label ||
     item.project_skills?.[0]?.skills?.categories?.name ||
-    stack[0] ||
     'Projet';
 
   return {
@@ -240,7 +246,7 @@ function mapProject(item: Record<string, any>): PortfolioProject {
     summary: item.description || item.content || item.title,
     description: item.description || item.content || item.title,
     story: item.content || item.description || item.title,
-    metrics: details,
+    metrics: asTextList(item.metrics),
     stack,
     image_url: item.image_url,
     github_url: item.github_url,
@@ -408,13 +414,24 @@ export async function getSkills(): Promise<PortfolioSkill[]> {
   if (!supabase) return fallbackSkills;
 
   try {
-    const { data, error } = await supabase.from('skills').select('id, name').order('name', { ascending: true });
+    const nested = await supabase
+      .from('skills')
+      .select('id, name, categories ( name )')
+      .order('name', { ascending: true });
 
-    if (error || !data || data.length === 0) return fallbackSkills;
+    const query = nested.error
+      ? await supabase.from('skills').select('id, name').order('name', { ascending: true })
+      : nested;
 
-    return data.map((item) => ({
+    if (query.error || !query.data || query.data.length === 0) return fallbackSkills;
+
+    // The nested select returns the joined category; the flat fallback does not.
+    type SkillRow = { id: string; name: string; categories?: { name: string } | null };
+
+    return (query.data as SkillRow[]).map((item) => ({
       id: item.id,
       name: item.name,
+      category: item.categories?.name ?? null,
     }));
   } catch {
     return fallbackSkills;

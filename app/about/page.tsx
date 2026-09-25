@@ -1,3 +1,6 @@
+// Admin edits must show up immediately: never prerender this page at build time.
+export const dynamic = 'force-dynamic';
+
 import { getProfile } from '@/lib/portfolio';
 
 const strengths = ['SQL', 'Python', 'Dashboarding', 'ETL', 'Supabase', 'Next.js'];
