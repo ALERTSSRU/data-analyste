@@ -70,10 +70,12 @@ function ChatIcon() {
   );
 }
 
-// ── Inner chrome (has access to language context) ──
-function ChromeInner({ children }: { children: React.ReactNode }) {
+// ── Public chrome (3D background, navigation, contact bubbles) ──
+// Split from ChromeInner so back-office routes never mount these hooks and
+// effects at all: an early return above the hooks would violate the Rules of
+// Hooks as soon as a visitor navigates between /login and a public page.
+function PublicChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAdmin = pathname?.startsWith('/admin');
   const { lang, setLang, t } = useLanguage();
   const [phase, setPhase] = useState(sceneState.phase);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -81,11 +83,7 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const isHome = pathname === '/';
-
-  // Completely bypass public header and overlays on Admin panel
-  if (isAdmin) {
-    return <div className="min-h-screen bg-[#060913] text-slate-100">{children}</div>;
-  }
+  const hasOwnBackground = pathname?.startsWith('/analytics') ?? false;
 
   // Only show Home link in the header nav per user request
   const links = [
@@ -159,7 +157,10 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
       <div className="relative min-h-screen transition-colors duration-300" style={{ color: 'var(--foreground)' }}>
         {/* 3D background */}
         <div className="pointer-events-none fixed inset-0 z-0">
-          <DataField />
+          {/* The analytics dashboard draws its own particle network; running the
+              global 3D field on top of it meant two WebGL contexts and two render
+              loops on the same page. */}
+          {!hasOwnBackground && <DataField />}
           {/* Overlay gradients reactive to dark/light CSS variables */}
           <div className="absolute inset-0 bg-linear-to-b from-(--overlay-gradient-start) via-(--overlay-gradient-middle) to-(--overlay-gradient-end) transition-all duration-300" />
           <div className="scene-wash absolute inset-0" />
@@ -342,6 +343,19 @@ function ChromeInner({ children }: { children: React.ReactNode }) {
       </div>
     </LenisScroll>
   );
+}
+
+// ── Route switch: back-office vs public ──
+function ChromeInner({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isBackOffice =
+    pathname?.startsWith('/admin') || pathname?.startsWith('/login');
+
+  if (isBackOffice) {
+    return <div className="min-h-screen bg-[#060913] text-slate-100">{children}</div>;
+  }
+
+  return <PublicChrome>{children}</PublicChrome>;
 }
 
 // ── Outer wrapper with language provider ──

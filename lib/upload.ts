@@ -1,10 +1,14 @@
-import { supabase } from '@/lib/portfolio';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 /**
  * Uploads an image file to Supabase Storage if available,
  * or compresses it via HTML Canvas and converts it to a light Data URL fallback.
  */
 export async function uploadPortfolioImage(file: File): Promise<string> {
+  // Uploads run in the browser with the admin session, so the storage policies
+  // in supabase/schema.sql (`to authenticated`) can accept the file.
+  const supabase = getSupabaseBrowserClient();
+
   // 1. Try uploading to Supabase Storage bucket 'portfolio-media'
   if (supabase) {
     try {

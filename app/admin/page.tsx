@@ -1,6 +1,9 @@
 'use client';
 
-import { supabase } from '@/lib/portfolio';
+import { RealtimeListener } from '@/app/components/RealtimeListener';
+import { signOut } from '@/app/login/actions';
+import { type AdminPayload, buildAdminPayload, isCrudTable, listToInput } from '@/lib/admin-payload';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { translateFrToEn } from '@/lib/translate';
 import {
   Award,
@@ -18,18 +21,25 @@ import {
   Plus,
   Save,
   Search,
-  Shield,
   ShieldCheck,
   Sparkles,
   Trash2,
   User,
   Wrench,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ConfirmModal } from '../components/admin/ConfirmModal';
 import { ImageUploadPicker } from '../components/admin/ImageUploadPicker';
 import { ToastContainer, ToastMessage, ToastType } from '../components/admin/ToastNotification';
+
+/**
+ * Cookie based client, shared with the server so that proxy.ts and
+ * /api/revalidate can verify the same session (see lib/supabase/browser.ts).
+ * Resolves to `null` during SSR and when Supabase is not configured.
+ */
+const supabase = getSupabaseBrowserClient();
 
 type UserSession = {
   id: string;
@@ -40,12 +50,6 @@ export default function AdminPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserSession | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Login form state
-  const [email, setEmail] = useState('alimzato.admin@gmail.com');
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
 
   // Active dashboard tab
   const [activeTab, setActiveTab] = useState<
@@ -140,7 +144,7 @@ export default function AdminPage() {
         }
         input.dispatchEvent(new Event('input', { bubbles: true }));
         addToast('success', 'Traduction réussie', 'Le texte a été traduis en anglais.');
-      } catch (err) {
+      } catch {
         addToast('error', 'Erreur de traduction', 'Le service de traduction est indisponible.');
       } finally {
         btn.innerText = origText;
@@ -179,6 +183,13 @@ export default function AdminPage() {
     };
   }, []);
 
+  // The route guard lives in proxy.ts; this covers a session lost mid-visit.
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [loading, user, router]);
+
   // Fetch all dashboard data when user is authenticated
   useEffect(() => {
     if (user && supabase) {
@@ -202,7 +213,7 @@ export default function AdminPage() {
         supabase.from('projects').select('*').order('created_at', { ascending: false }),
         supabase.from('experiences').select('*').order('start_date', { ascending: false }),
         supabase.from('education').select('*').order('start_date', { ascending: false }),
-        supabase.from('skills').select('*').order('name', { ascending: true }),
+        supabase.from('skills').select('*, categories ( id, name )').order('name', { ascending: true }),
         supabase.from('certifications').select('*').order('issue_date', { ascending: false }),
         supabase.from('categories').select('*').order('name', { ascending: true }),
         supabase.from('metrics').select('*').order('created_at', { ascending: true }),
@@ -261,37 +272,9 @@ export default function AdminPage() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supabase) return;
-    setAuthLoading(true);
-    setAuthError('');
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        setAuthError(error.message);
-        addToast('error', 'Échec de connexion', error.message);
-      } else if (data.user) {
-        setUser({ id: data.user.id, email: data.user.email });
-        addToast('success', 'Bienvenue !', 'Connexion au terminal administrateur réussie.');
-      }
-    } catch (err: any) {
-      setAuthError(err.message || 'Erreur d’authentification');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
   const handleLogout = async () => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    setUser(null);
-    addToast('info', 'Déconnexion', 'Vous avez été déconnecté de l’espace administrateur.');
+    // Server Action: clears the auth cookies, then redirects to /login.
+    await signOut();
   };
 
   const triggerRevalidation = async () => {
@@ -405,10 +388,12 @@ export default function AdminPage() {
   const openForm = (item: any = null) => {
     setEditingItem(item);
     setFormError('');
-    if (activeTab === 'projects') {
-      setProjectMainImage(item?.image_url || '');
-      setScreenshotUrls(Array.isArray(item?.screenshots) ? item.screenshots : []);
-    }
+    // Always reset media state so a previous project's images never leak into
+    // the next create/edit form (uploads are stored outside the DOM form).
+    setProjectMainImage(activeTab === 'projects' ? item?.image_url || '' : '');
+    setScreenshotUrls(
+      activeTab === 'projects' && Array.isArray(item?.screenshots) ? item.screenshots : []
+    );
     setIsFormOpen(true);
   };
 
@@ -445,60 +430,24 @@ export default function AdminPage() {
     setFormLoading(true);
     setFormError('');
 
-    const formData = new FormData(e.currentTarget);
-    const data: Record<string, any> = {};
-    formData.forEach((value, key) => {
-      if (key === 'is_published' || key === 'is_current' || key === 'is_featured') {
-        data[key] = value === 'on' || value === 'true';
-      } else {
-        data[key] = value;
-      }
-    });
-
-    if (activeTab === 'projects') {
-      data.is_published = formData.get('is_published') === 'on';
-      data.image_url = projectMainImage;
-      data.screenshots = screenshotUrls.filter((u) => u && u.trim() !== '');
-
-      const techDetailsStr = formData.get('tech_details') as string;
-      const techList = techDetailsStr ? techDetailsStr.split(',').map((s) => s.trim()).filter(Boolean) : [];
-      
-      const categoryVal = formData.get('category') as string;
-      if (categoryVal && categoryVal.trim() && !techList.includes(categoryVal.trim())) {
-        techList.unshift(categoryVal.trim());
-      }
-      data.tech_details = techList;
-
-      // Ensure description is populated from description or summary field
-      data.description = (formData.get('description') as string) || (formData.get('summary') as string) || data.title;
-
-      // CRITICAL: Remove fields that are not direct columns in Supabase 'projects' table
-      delete data.category;
-      delete data.summary;
-      delete data.collaborators;
+    if (!isCrudTable(activeTab)) {
+      setFormLoading(false);
+      return;
     }
 
-    if (activeTab === 'experiences') {
-      data.is_current = formData.get('is_current') === 'on';
-    }
-
-    if (activeTab === 'education') {
-      data.is_current = formData.get('is_current') === 'on';
-      data.school_name = (formData.get('school_name') as string) || (formData.get('institution') as string) || '';
-      delete data.institution;
-    }
-
-    if (activeTab === 'certifications') {
-      data.is_featured = formData.get('is_featured') === 'on';
-      data.issuer = (formData.get('issuer') as string) || (formData.get('issuing_organization') as string) || '';
-      delete data.platform_name;
-      delete data.issuing_organization;
-      delete data.issue_date;
-      delete data.expiry_date;
-    }
-
-    if (activeTab === 'skills') {
-      delete data.category_id;
+    // `buildAdminPayload` owns the form → database column mapping and validates
+    // required fields; see lib/admin-payload.ts + supabase/schema.sql.
+    let data: AdminPayload;
+    try {
+      data = buildAdminPayload(activeTab, new FormData(e.currentTarget), {
+        imageUrl: projectMainImage,
+        screenshots: screenshotUrls,
+      });
+    } catch (err: any) {
+      setFormLoading(false);
+      setFormError(err.message || 'Formulaire incomplet.');
+      addToast('error', 'Champ obligatoire manquant', err.message);
+      return;
     }
 
     try {
@@ -547,66 +496,20 @@ export default function AdminPage() {
     );
   }
 
-  // Not logged in -> Show sleek professional login view
+  // proxy.ts already redirects unauthenticated visitors to /login, so this
+  // branch is only reached when the session expires while the dashboard is open.
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#060913] px-4 py-12">
+      <div className="flex min-h-screen items-center justify-center bg-[#070a14] px-4 text-cyan-400">
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-
-        <div className="w-full max-w-sm rounded-3xl border border-slate-800 bg-[#0a0f1d] p-8 shadow-2xl space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shadow-inner">
-              <Lock className="w-6 h-6" />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-white mt-3">Terminal Administrateur</h1>
-            <p className="text-xs text-slate-400 font-normal">Identifiez-vous pour gérer votre portfolio</p>
-          </div>
-
-          {authError && (
-
-            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs font-semibold text-rose-300 text-center">
-              {authError}
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5 font-mono">
-                Email
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
-                placeholder="admin@exemple.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-300 mb-1.5 font-mono">
-                Mot de passe
-              </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={authLoading}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold text-xs shadow-lg shadow-cyan-900/30 hover:from-cyan-500 hover:to-blue-500 transition duration-200 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>{authLoading ? 'Authentification...' : 'Se connecter'}</span>
-            </button>
-          </form>
+        <div className="text-center font-mono space-y-4">
+          <div className="w-8 h-8 mx-auto border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs uppercase tracking-widest font-semibold text-slate-400">
+            Session expirée — redirection vers la connexion...
+          </p>
+          <Link href="/login" className="text-xs font-bold text-cyan-400 underline">
+            Se reconnecter
+          </Link>
         </div>
       </div>
     );
@@ -629,8 +532,8 @@ export default function AdminPage() {
 
   const filteredEducation = education.filter(
     (ed) =>
-      ed.institution?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ed.school_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ed.field_of_study?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ed.degree?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -651,6 +554,8 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#060913] text-slate-100 font-sans pb-24">
+      {/* Admin-only: refreshes every open dashboard when the database changes. */}
+      <RealtimeListener />
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <ConfirmModal
         isOpen={confirmState.isOpen}
@@ -948,7 +853,10 @@ export default function AdminPage() {
                       <h3 className="text-sm font-bold text-white">{e.position}</h3>
                       <span className="text-cyan-400 font-semibold text-xs">@ {e.company}</span>
                     </div>
-                    <p className="text-[11px] font-mono text-slate-400">{e.period || `${e.start_date} - ${e.end_date || 'Présent'}`}</p>
+                    <p className="text-[11px] font-mono text-slate-400">
+                      {e.start_date}
+                      {e.end_date ? ` → ${e.end_date}` : e.is_current ? ' → Présent' : ''}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
@@ -989,10 +897,11 @@ export default function AdminPage() {
                   >
                     <div>
                       <span className="text-[10px] uppercase font-mono font-bold text-cyan-400">
-                        {ed.period || ed.start_date}
+                        {ed.start_date}
+                        {ed.end_date ? ` → ${ed.end_date}` : ed.is_current ? ' → Présent' : ''}
                       </span>
                       <h3 className="text-sm font-bold text-white mt-1">{ed.degree}</h3>
-                      <p className="text-xs text-slate-300">{ed.institution || ed.school_name}</p>
+                      <p className="text-xs text-slate-300">{ed.school_name}</p>
                     </div>
                     <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80">
                       <button
@@ -1034,7 +943,9 @@ export default function AdminPage() {
                   >
                     <div>
                       <p className="text-xs font-bold text-white">{s.name}</p>
-                      {s.category && <p className="text-[10px] text-slate-400">{s.category}</p>}
+                      {s.categories?.name && (
+                        <p className="text-[10px] text-slate-400">{s.categories.name}</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 ml-1">
                       <button
@@ -1075,9 +986,11 @@ export default function AdminPage() {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] uppercase font-bold text-cyan-400 font-mono">
-                          {c.issuer || c.issuing_organization}
+                          {c.issuer}
                         </span>
-                        {c.date && <span className="text-[10px] text-slate-400 font-mono">{c.date}</span>}
+                        {c.issue_date && (
+                          <span className="text-[10px] text-slate-400 font-mono">{c.issue_date}</span>
+                        )}
                       </div>
                       <h3 className="text-sm font-bold text-white mt-1">{c.title}</h3>
                     </div>
@@ -1515,7 +1428,7 @@ export default function AdminPage() {
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                        Résumé
+                        Résumé (affiché sur la carte projet)
                       </label>
                       <button
                         type="button"
@@ -1538,11 +1451,11 @@ export default function AdminPage() {
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                        Description
+                        Contexte / Étude de cas (page détail)
                       </label>
                       <button
                         type="button"
-                        onClick={(e) => handleTranslateField(e, '#project-desc')}
+                        onClick={(e) => handleTranslateField(e, '#project-content')}
                         className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1"
                       >
                         <Sparkles className="w-3 h-3" />
@@ -1550,10 +1463,10 @@ export default function AdminPage() {
                       </button>
                     </div>
                     <textarea
-                      id="project-desc"
-                      name="description"
-                      rows={3}
-                      defaultValue={editingItem?.description || ''}
+                      id="project-content"
+                      name="content"
+                      rows={4}
+                      defaultValue={editingItem?.content || ''}
                       className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
                     />
                   </div>
@@ -1582,14 +1495,21 @@ export default function AdminPage() {
                     <input
                       type="text"
                       name="tech_details"
-                      defaultValue={
-                        editingItem?.tech_details
-                          ? Array.isArray(editingItem.tech_details)
-                            ? editingItem.tech_details.join(', ')
-                            : editingItem.tech_details
-                          : ''
-                      }
+                      defaultValue={listToInput(editingItem?.tech_details)}
                       placeholder="Python, SQL, PowerBI, Supabase"
+                      className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                      Indicateurs & résultats (séparés par des virgules)
+                    </label>
+                    <input
+                      type="text"
+                      name="metrics"
+                      defaultValue={listToInput(editingItem?.metrics)}
+                      placeholder="+31% conversion, 4 sources unifiées"
                       className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
                     />
                   </div>
@@ -1652,17 +1572,59 @@ export default function AdminPage() {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
-                      Période
-                    </label>
-                    <input
-                      type="text"
-                      name="period"
-                      defaultValue={editingItem?.period || ''}
-                      placeholder="2023 - Présent"
-                      className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                        Date de début *
+                      </label>
+                      <input
+                        type="text"
+                        name="start_date"
+                        required
+                        defaultValue={editingItem?.start_date || ''}
+                        placeholder="2024-03 ou Mars 2024"
+                        className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                        Date de fin
+                      </label>
+                      <input
+                        type="text"
+                        name="end_date"
+                        defaultValue={editingItem?.end_date || ''}
+                        placeholder="Laisser vide si poste actuel"
+                        className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                        Slug (URL du parcours)
+                      </label>
+                      <input
+                        type="text"
+                        name="slug"
+                        defaultValue={editingItem?.slug || ''}
+                        placeholder="Généré automatiquement si vide"
+                        className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 pt-6">
+                      <input
+                        type="checkbox"
+                        id="is_current"
+                        name="is_current"
+                        defaultChecked={editingItem ? !!editingItem.is_current : true}
+                        className="w-4 h-4 rounded border-slate-700 text-cyan-500 focus:ring-cyan-400"
+                      />
+                      <label htmlFor="is_current" className="text-xs font-bold text-slate-200">
+                        Poste en cours
+                      </label>
+                    </div>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
@@ -1712,20 +1674,60 @@ export default function AdminPage() {
                       type="text"
                       name="school_name"
                       required
-                      defaultValue={editingItem?.school_name || editingItem?.institution || ''}
+                      defaultValue={editingItem?.school_name || ''}
                       className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
-                      Période
+                      Domaine d'études
                     </label>
                     <input
                       type="text"
-                      name="period"
-                      defaultValue={editingItem?.period || ''}
+                      name="field_of_study"
+                      defaultValue={editingItem?.field_of_study || ''}
+                      placeholder="Data & Informatique"
                       className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
                     />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                        Date de début *
+                      </label>
+                      <input
+                        type="text"
+                        name="start_date"
+                        required
+                        defaultValue={editingItem?.start_date || ''}
+                        placeholder="2021-09"
+                        className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                        Date de fin
+                      </label>
+                      <input
+                        type="text"
+                        name="end_date"
+                        defaultValue={editingItem?.end_date || ''}
+                        placeholder="2024-06"
+                        className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="edu_is_current"
+                      name="is_current"
+                      defaultChecked={editingItem ? !!editingItem.is_current : false}
+                      className="w-4 h-4 rounded border-slate-700 text-cyan-500 focus:ring-cyan-400"
+                    />
+                    <label htmlFor="edu_is_current" className="text-xs font-bold text-slate-200">
+                      Formation en cours
+                    </label>
                   </div>
                 </>
               )}
@@ -1750,12 +1752,23 @@ export default function AdminPage() {
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
                       Catégorie
                     </label>
-                    <input
-                      type="text"
-                      name="category"
-                      defaultValue={editingItem?.category || 'Data Analysis'}
+                    <select
+                      name="category_id"
+                      defaultValue={editingItem?.category_id || ''}
                       className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
-                    />
+                    >
+                      <option value="">— Aucune catégorie —</option>
+                      {categories.map((cat: any) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    {categories.length === 0 && (
+                      <p className="mt-1 text-[11px] text-amber-400/80">
+                        Aucune catégorie en base : créez-les dans la table <code>categories</code> pour les regrouper.
+                      </p>
+                    )}
                   </div>
                 </>
               )}
@@ -1783,7 +1796,7 @@ export default function AdminPage() {
                       type="text"
                       name="issuer"
                       required
-                      defaultValue={editingItem?.issuer || editingItem?.issuing_organization || ''}
+                      defaultValue={editingItem?.issuer || ''}
                       className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
                     />
                   </div>
@@ -1793,9 +1806,9 @@ export default function AdminPage() {
                         Date d'obtention
                       </label>
                       <input
-                        type="text"
-                        name="date"
-                        defaultValue={editingItem?.date || editingItem?.issue_date || ''}
+                        type="date"
+                        name="issue_date"
+                        defaultValue={editingItem?.issue_date || ''}
                         className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
                       />
                     </div>
@@ -1805,11 +1818,48 @@ export default function AdminPage() {
                       </label>
                       <input
                         type="text"
-                        name="duration"
-                        defaultValue={editingItem?.duration || ''}
+                        name="duration_label"
+                        defaultValue={editingItem?.duration_label || ''}
+                        placeholder="6 semaines"
                         className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                      Lien du certificat (vérification)
+                    </label>
+                    <input
+                      type="text"
+                      name="credential_url"
+                      defaultValue={editingItem?.credential_url || ''}
+                      placeholder="https://..."
+                      className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      name="description"
+                      rows={3}
+                      defaultValue={editingItem?.description || ''}
+                      placeholder="Compétences validées, contenu de la formation..."
+                      className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="is_featured"
+                      name="is_featured"
+                      defaultChecked={editingItem ? !!editingItem.is_featured : true}
+                      className="w-4 h-4 rounded border-slate-700 text-cyan-500 focus:ring-cyan-400"
+                    />
+                    <label htmlFor="is_featured" className="text-xs font-bold text-slate-200">
+                      Mettre en avant sur la page d'accueil
+                    </label>
                   </div>
                 </>
               )}
@@ -1874,6 +1924,18 @@ export default function AdminPage() {
                         <option value="activity">Activity (Certifications & KPIs)</option>
                       </select>
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                      Ordre d'affichage
+                    </label>
+                    <input
+                      type="number"
+                      name="sort_order"
+                      defaultValue={editingItem?.sort_order ?? 0}
+                      className="w-full rounded-xl border border-slate-700/80 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 focus:border-cyan-400 focus:outline-none"
+                    />
                   </div>
 
                   <div>

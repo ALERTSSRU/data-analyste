@@ -2,7 +2,7 @@
 
 import type { PortfolioProfile } from '@/lib/portfolio';
 import { ensureExternalUrl } from '@/lib/portfolio';
-import { useLanguage, Trans } from '@/lib/LanguageContext';
+import { useLanguage } from '@/lib/LanguageContext';
 
 export function ContactPageClient({ profile }: { profile: PortfolioProfile }) {
   const { t } = useLanguage();

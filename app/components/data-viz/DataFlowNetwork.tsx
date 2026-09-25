@@ -19,11 +19,12 @@ type Particle = {
   basePosition: THREE.Vector3;
 };
 
-const DataFlowScene = ({ 
-  particleCount = 200, 
-  connectionDistance = 25, 
+const DataFlowScene = ({
+  particleCount = 200,
+  // `connectionDistance` is part of the public props for API stability but is
+  // not used yet: particles are rendered as a point cloud without link lines.
   flowSpeed = 0.002,
-  color = '#06b6d4'
+  color = '#06b6d4',
 }: DataFlowNetworkProps) => {
   const pointsRef = useRef<THREE.Points>(null);
   const { camera, size } = useThree();

@@ -1,3 +1,6 @@
+// Admin edits must show up immediately: never prerender this page at build time.
+export const dynamic = 'force-dynamic';
+
 import { getExperiences } from '@/lib/portfolio';
 
 export default async function ExperiencesPage() {

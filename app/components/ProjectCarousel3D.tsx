@@ -2,8 +2,7 @@
 
 import type { PortfolioProject } from '@/lib/portfolio';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import gsap from 'gsap';
+import { useEffect, useRef, useState } from 'react';
 
 interface ProjectCarousel3DProps {
   projects: PortfolioProject[];
@@ -256,7 +255,6 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
             
             // Enhanced 3D effects for active card
             const zOffset = isActive ? 40 : 0;
-            const shadowIntensity = isActive ? 0.35 : 0.15;
 
             return (
               <div
