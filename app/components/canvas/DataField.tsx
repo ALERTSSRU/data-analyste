@@ -89,14 +89,6 @@ function lerpBuf(out: Float32Array, a: Float32Array, b: Float32Array, t: number)
   for (let i = 0; i < out.length; i++) out[i] = a[i] + (b[i] - a[i]) * t;
 }
 
-// ─── COLOR CYCLING BY PHASE ──────────────────
-function getPhaseColor(progress: number): string {
-  if (progress < 0.22) return '#22d3ee'; // Hero: Cyan
-  if (progress < 0.48) return '#0ea5e9'; // School: Sky blue
-  if (progress < 0.74) return '#34d399'; // Bank: Emerald
-  return '#c4b5fd'; // Signal: Violet
-}
-
 // ─── DATA STREAMS ────────────────────────────
 function DataStreams({ progressRef, streamCount = 24 }: { progressRef: React.MutableRefObject<number>; streamCount?: number }) {
   const COLS = ['#22d3ee', '#34d399', '#c4b5fd', '#60a5fa', '#f472b6', '#67e8f9', '#a78bfa'];
@@ -263,7 +255,7 @@ function DataStreams({ progressRef, streamCount = 24 }: { progressRef: React.Mut
 }
 
 // ─── FLOATING GLYPHS ─────────────────────────
-function FloatingGlyphs({ progressRef, glyphCount = 35 }: { progressRef: React.MutableRefObject<number>; glyphCount?: number }) {
+function FloatingGlyphs({ glyphCount = 35 }: { glyphCount?: number }) {
   const LABELS = [
     'SELECT *', 'GROUP BY', 'AVG(score)', 'JOIN ON', 'WHERE id=',
     '01001101', '0xFF3A', 'NULL', 'ETL', 'PIPELINE',
@@ -306,14 +298,6 @@ function FloatingGlyphs({ progressRef, glyphCount = 35 }: { progressRef: React.M
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    const p = progressRef.current;
-
-    // Determine phase colors
-    let currentColors: string[];
-    if (p < 0.22) currentColors = PHASE_COLS.hero;
-    else if (p < 0.48) currentColors = PHASE_COLS.school;
-    else if (p < 0.74) currentColors = PHASE_COLS.bank;
-    else currentColors = PHASE_COLS.signal;
 
     glyphs.forEach((g, i) => {
       const m = meshRefs.current[i];
@@ -680,7 +664,7 @@ function DataMorph({ tier = 'high' }: { tier?: PerfTier }) {
       <DataStreams progressRef={progressRef} streamCount={streamCount} />
 
       {/* Floating analytics glyphs */}
-      <FloatingGlyphs progressRef={progressRef} glyphCount={glyphCount} />
+      <FloatingGlyphs glyphCount={glyphCount} />
 
       {/* ── MODEL 1: Neural Constellation Sphere ── */}
       <group ref={schoolGroup}>
@@ -783,7 +767,6 @@ export function DataField() {
   }, []);
 
   const dpr: [number, number] = tier === 'low' ? [1, 1] : tier === 'medium' ? [1, 1.25] : [1, 1.5];
-  const enableBloom = tier !== 'low';
   const bloomIntensity = tier === 'medium' ? 0.8 : 1.4;
 
   return (
