@@ -10,16 +10,23 @@ interface ProjectCarousel3DProps {
 
 export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
   const count        = projects.length;
-  const [angle, setAngle]           = useState(0);
-  const [targetAngle, setTargetAngle] = useState(0);
+  const angleRef = useRef(0);
+  const targetAngleRef = useRef(0);
   const [activeIndex, setActiveIndex] = useState(0);
+  const activeIndexRef = useRef(0);
   const [isPaused, setIsPaused]       = useState(false);
+  const isPausedRef = useRef(isPaused);
+
+  // Keep ref in sync
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
 
   // Internal refs — never cause re-renders
   const rafRef          = useRef<number>(0);
-  const autoTimerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const resumeRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stageRef        = useRef<HTMLDivElement>(null);
+  const cylinderRef     = useRef<HTMLDivElement>(null);
 
   const dragActiveRef   = useRef(false); // true ONLY when confirmed horizontal drag
   const startXRef       = useRef(0);
@@ -48,46 +55,57 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
     ? Math.max(230, count * 60)
     : Math.max(280, count * 72);
 
-  // ── Smooth damping ──
+  // ── Smooth damping & auto-rotation ──
   useEffect(() => {
-    const loop = () => {
-      setAngle((prev) => {
-        const d = targetAngle - prev;
-        return Math.abs(d) < 0.04 ? targetAngle : prev + d * 0.09;
-      });
+    let lastTime = performance.now();
+    const loop = (time: DOMHighResTimeStamp) => {
+      const dt = time - lastTime;
+      lastTime = time;
+      const clampedDt = Math.min(dt, 100);
+
+      if (!isPausedRef.current && !dragActiveRef.current) {
+        targetAngleRef.current -= 0.28 * (clampedDt / 30);
+      }
+
+      const prevAngle = angleRef.current;
+      const d = targetAngleRef.current - prevAngle;
+      
+      let newAngle = prevAngle;
+      if (Math.abs(d) < 0.04) {
+        newAngle = targetAngleRef.current;
+      } else {
+        newAngle = prevAngle + d * 0.09;
+      }
+      
+      angleRef.current = newAngle;
+
+      // Update DOM directly to bypass React renders
+      if (cylinderRef.current) {
+        cylinderRef.current.style.transform = `rotateY(${newAngle}deg)`;
+      }
+
+      // Sync active index
+      if (count > 0) {
+        const n = ((-newAngle % 360) + 360) % 360;
+        const i = Math.round(n / anglePerCard) % count;
+        const index = i < 0 ? i + count : i;
+        if (index !== activeIndexRef.current) {
+          activeIndexRef.current = index;
+          setActiveIndex(index);
+        }
+      }
+
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [targetAngle]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [count, anglePerCard]);
 
-  // ── Active index ──
-  useEffect(() => {
-    const n = ((-angle % 360) + 360) % 360;
-    const i = Math.round(n / anglePerCard) % count;
-    setActiveIndex(i < 0 ? i + count : i);
-  }, [angle, anglePerCard, count]);
-
-  // ── Auto-rotation helpers ──
-  const startAuto = () => {
-    stopAuto();
-    autoTimerRef.current = setInterval(() => {
-      setTargetAngle((p) => p - 0.28);
-    }, 30);
-  };
-  const stopAuto = () => {
-    if (autoTimerRef.current) { clearInterval(autoTimerRef.current); autoTimerRef.current = null; }
-  };
   const scheduleResume = (ms = 2400) => {
     if (resumeRef.current) clearTimeout(resumeRef.current);
     resumeRef.current = setTimeout(() => setIsPaused(false), ms);
   };
-
-  useEffect(() => {
-    if (!isPaused) startAuto(); else stopAuto();
-    return stopAuto;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPaused]);
 
   // ── Native-friendly pointer & touch handlers ──
   useEffect(() => {
@@ -118,20 +136,20 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
         // Confirmed horizontal drag
         dragActiveRef.current = true;
         movedRef.current      = true;
-        stopAuto();
+        setIsPaused(true);
         if (resumeRef.current) clearTimeout(resumeRef.current);
       }
 
       if (dragActiveRef.current) {
         e.preventDefault();
         const speed = e.pointerType === 'touch' ? 0.32 : 0.20;
-        setTargetAngle(baseAngleRef.current + dx * speed);
+        targetAngleRef.current = baseAngleRef.current + dx * speed;
       }
     };
 
     const onUp = () => {
       if (dragActiveRef.current) {
-        setTargetAngle((prev) => Math.round(prev / anglePerCard) * anglePerCard);
+        targetAngleRef.current = Math.round(targetAngleRef.current / anglePerCard) * anglePerCard;
         scheduleResume();
       }
       dragActiveRef.current = false;
@@ -161,19 +179,19 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
         if (Math.abs(dy) > Math.abs(dx)) return; // let page scroll
         dragActiveRef.current = true;
         movedRef.current      = true;
-        stopAuto();
+        setIsPaused(true);
         if (resumeRef.current) clearTimeout(resumeRef.current);
       }
 
       if (dragActiveRef.current) {
         if (e.cancelable) e.preventDefault();
-        setTargetAngle(baseAngleRef.current + dx * 0.34);
+        targetAngleRef.current = baseAngleRef.current + dx * 0.34;
       }
     };
 
     const onTouchEnd = () => {
       if (dragActiveRef.current) {
-        setTargetAngle((prev) => Math.round(prev / anglePerCard) * anglePerCard);
+        targetAngleRef.current = Math.round(targetAngleRef.current / anglePerCard) * anglePerCard;
         scheduleResume();
       }
       dragActiveRef.current = false;
@@ -205,17 +223,9 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anglePerCard]); // *targetAngle is read via a separate ref below
 
-  // Keep baseAngleRef in sync with targetAngle so the closure always has latest value
-  const targetAngleRef = useRef(targetAngle);
-  useEffect(() => {
-    targetAngleRef.current = targetAngle;
-    // Also patch baseAngle when NOT dragging so next drag starts fresh
-    if (!dragActiveRef.current) baseAngleRef.current = targetAngle;
-  }, [targetAngle]);
-
   const goTo = (idx: number) => {
-    stopAuto();
-    setTargetAngle(-idx * anglePerCard);
+    setIsPaused(true);
+    targetAngleRef.current = -idx * anglePerCard;
     scheduleResume(2600);
   };
 
@@ -241,10 +251,11 @@ export function ProjectCarousel3D({ projects }: ProjectCarousel3DProps) {
       >
         {/* Rotating cylinder */}
         <div
+          ref={cylinderRef}
           className="absolute inset-0"
           style={{
             transformStyle: 'preserve-3d',
-            transform: `rotateY(${angle}deg)`,
+            transform: `rotateY(0deg)`,
           }}
         >
           {projects.map((project, i) => {
